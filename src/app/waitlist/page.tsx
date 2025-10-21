@@ -22,6 +22,7 @@ const formSchema = z.object({
   email: z.string()
 });
 import { FaCheckCircle } from "react-icons/fa";
+import Image from 'next/image';
 
 const Page = () => {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -58,58 +59,81 @@ const Page = () => {
   return (
     <div className="flex justify-center items-center py-20 min-h-[80dvh]">
 
-          <div className={`w-full max-w-md mx-auto rounded-xl z-50`}>
+      <div className={`w-full max-w-md mx-auto rounded-xl z-50`}>
 
-            <div className="text-center">
-              <h2
-               
-                className={` text-5xl font-bold mb-4 font-serif`}
-              >
-                Join our waitlist<span className='text-primary'>*</span>
-              </h2>
-              <p
-                
-                className={`text-base mb-6 font-sans max-w-xl text-balance`}
-              >
-                Be the first to access new features. Enter your email below to join the waitlist.
-              </p>
-            </div>
+        <div className="text-center">
+          <h2
 
-            {isEmailSent ? (
-              <div className="mb-4 p-4 text-sm flex items-center justify-center gap-2 transition-all duration-200 animate-in text-green-800 bg-green-100 rounded-lg text-center" role="alert">
-                <FaCheckCircle className='text-primary text-xl animate-pulse' />
+            className={` text-6xl font-medium mb-4 font-serif`}
+          >
+            Join our waitlist<span className='text-primary'>*</span>
+          </h2>
+          <p
 
-                <span className="font-medium">Success!</span> You&apos;ve been added to the waitlist.
-              </div>
-            ) :
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="items-center justify-center max-w-3xl mx-auto flex">
-                  {/* TODO: make the button and input bigger */}
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem className='gap-0'>
-                        <FormLabel></FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="your email address"
+            className={`text-lg leading-tight mb-6 font-sans max-w-xl text-balance`}
+          >
+            Be the first to access new features. Enter your email below to join the waitlist.
+          </p>
+        </div>
 
-                            type="email"
-                            {...field}
-                            className='rounded-r-none rounded-l-full'
-                          />
-                        </FormControl>
+        {isEmailSent ? (
+          <div className="mb-4 p-4 text-sm flex items-center justify-center gap-2 transition-all duration-200 animate-in text-green-800 bg-green-100 rounded-lg text-center" role="alert">
+            <FaCheckCircle className='text-primary text-xl animate-pulse' />
 
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className='rounded-l-none rounded-r-full text-white'>Claim Invite</Button>
-                </form>
-              </Form>}
+            <span className="font-medium">Success!</span> You&apos;ve been added to the waitlist.
           </div>
-     
+        ) :
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="items-center justify-center max-w-3xl mx-auto flex">
+              {/* TODO: make the button and input bigger */}
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className='gap-0'>
+                    <FormLabel></FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="your email address"
+
+                        type="email"
+                        {...field}
+                        className='rounded-r-none border-x-[1px] border-gray-600 rounded-l-full'
+                      />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className='rounded-l-none rounded-r-full text-white'>Claim Invite</Button>
+            </form>
+          </Form>}
+        <div className="flex justify-center -ml-6 max-h-64 w-full mx-auto max-w-xl mt-12  ">
+          <Image
+            src="/images/tasks.png"
+            alt="Task Management"
+            width={120}
+            height={120}
+            className="object-contain -rotate-12 -mr-12 animate-bounce "
+          />
+          <Image
+            src="/images/calendar.png"
+            alt="Task Management"
+            width={120}
+            height={120}
+            className="object-contain animate-bounce"
+          />
+          <Image
+            src="/images/calendar_with_clouds.png"
+            alt="Task Management"
+            width={75}
+            height={75}
+            className="object-contain rotate-12 -ml-6 animate-bounce" 
+          />
+        </div>
+      </div>
+
     </div>
   );
 };
