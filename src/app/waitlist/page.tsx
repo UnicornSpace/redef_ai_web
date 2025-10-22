@@ -17,9 +17,13 @@ import { Input } from "@/components/ui/input"
 import { waitlistAction } from '@/actions/waitlist';
 import { toast } from "sonner"
 import Navbar from '@/components/header';
-
+import {
+  RadioGroup,
+  RadioGroupItem
+} from "@/components/ui/radio-group"
 const formSchema = z.object({
-  email: z.string()
+  email: z.string(),
+  preferred_device: z.string().optional()
 });
 import { FaCheckCircle } from "react-icons/fa";
 
@@ -35,7 +39,8 @@ const Page = () => {
     try {
       console.log(values);
       const res = await waitlistAction({
-        email: values.email
+        email: values.email,
+        preferred_device: values.preferred_device || ""
       })
       if (!res.success) {
         toast.error(`Failed to join the waitlist: ${res.error}`);
@@ -58,58 +63,94 @@ const Page = () => {
   return (
     <div className="flex justify-center items-center py-20 min-h-[80dvh]">
 
-          <div className={`w-full max-w-md mx-auto rounded-xl z-50`}>
+      <div className={`w-full max-w-md mx-auto rounded-xl z-50`}>
 
-            <div className="text-center">
-              <h2
-               
-                className={` text-5xl font-bold mb-4 font-serif`}
-              >
-                Join our waitlist<span className='text-primary'>*</span>
-              </h2>
-              <p
-                
-                className={`text-base mb-6 font-sans max-w-xl text-balance`}
-              >
-                Be the first to access new features. Enter your email below to join the waitlist.
-              </p>
-            </div>
+        <div className="text-center">
+          <h2
 
-            {isEmailSent ? (
-              <div className="mb-4 p-4 text-sm flex items-center justify-center gap-2 transition-all duration-200 animate-in text-green-800 bg-green-100 rounded-lg text-center" role="alert">
-                <FaCheckCircle className='text-primary text-xl animate-pulse' />
+            className={` text-5xl font-bold mb-4 font-serif`}
+          >
+            Join our waitlist<span className='text-primary'>*</span>
+          </h2>
+          <p
 
-                <span className="font-medium">Success!</span> You&apos;ve been added to the waitlist.
-              </div>
-            ) :
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="items-center justify-center max-w-3xl mx-auto flex">
-                  {/* TODO: make the button and input bigger */}
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem className='gap-0'>
-                        <FormLabel></FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="your email address"
+            className={`text-base mb-6 font-sans max-w-xl text-balance`}
+          >
+            Be the first to access new features. Enter your email below to join the waitlist.
+          </p>
+        </div>
 
-                            type="email"
-                            {...field}
-                            className='rounded-r-none rounded-l-full'
-                          />
-                        </FormControl>
+        {isEmailSent ? (
+          <div className="mb-4 p-4 text-sm flex items-center justify-center gap-2 transition-all duration-200 animate-in text-green-800 bg-green-100 rounded-lg text-center" role="alert">
+            <FaCheckCircle className='text-primary text-xl animate-pulse' />
 
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className='rounded-l-none rounded-r-full text-white'>Claim Invite</Button>
-                </form>
-              </Form>}
+            <span className="font-medium">Success!</span> You&apos;ve been added to the waitlist.
           </div>
-     
+        ) :
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="items-center justify-center max-w-3xl mx-auto flex flex-col-reverse gap-2 mt-20">
+              {/* TODO: make the button and input bigger */}
+              <div className='flex'>
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className='gap-0'>
+                      <FormLabel></FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="your email address"
+
+                          type="email"
+                          {...field}
+                          className='rounded-r-none rounded-l-full'
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button type="submit" className='rounded-l-none rounded-r-full text-white'>Claim Invite</Button>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="preferred_device"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Select your preferred device</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        className="flex  space-y-1"
+                      >
+                        {[
+                          ["Android", "android"],
+                          ["iOS", "ios"],
+                        ].map((option, index) => (
+                          <FormItem className="flex items-center space-x-3 space-y-0" key={index}>
+                            <FormControl>
+                              <RadioGroupItem value={option[1]} />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {option[0]}
+                            </FormLabel>
+                          </FormItem>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    {/* <FormDescription></FormDescription> */}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>}
+      </div>
+
     </div>
   );
 };
