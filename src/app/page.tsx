@@ -5,9 +5,11 @@ import React from 'react'
 import { FiArrowRight } from "react-icons/fi";
 import { TbArrowRight, TbArrowUpRight, TbCalendar, TbChecklist, TbSparkles } from "react-icons/tb";
 import Image from 'next/image';
+// import posthog from 'posthog-js';
 
 
 const page = async () => {
+  // posthog.capture('my event', { property: 'value' })
   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!)
   const { data, error } = await supabase
     .from('task')
@@ -72,7 +74,7 @@ const page = async () => {
             <h3 className="text-3xl font-medium mb-2 font-serif">AI Assistant</h3>
             <p className="text-gray-600">Get personalized productivity insights and suggestions powered by AI.</p>
           </div>
-         <div className="md:w-1/2">
+          <div className="md:w-1/2">
             <div className="relative h-64 w-full">
               <Image
                 src="/images/calendar_with_clouds.png"
