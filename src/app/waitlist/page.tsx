@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -21,6 +21,7 @@ import {
   RadioGroup,
   RadioGroupItem
 } from "@/components/ui/radio-group"
+import { RiAndroidLine, RiAppleLine } from "react-icons/ri"
 const formSchema = z.object({
   email: z.string(),
   preferred_device: z.string().describe("Please enter your device preference")  
@@ -29,6 +30,7 @@ import { FaCheckCircle } from "react-icons/fa";
 import Image from 'next/image';
 
 const Page = () => {
+  const id = useId()
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
 
@@ -64,12 +66,12 @@ const Page = () => {
   return (
     <div className="flex justify-center items-center py-20 min-h-[80dvh]">
 
-      <div className={`w-full max-w-md mx-auto rounded-xl z-50`}>
+      <div className={`w-full max-w-md md:max-w-xl mx-auto rounded-xl z-50`}>
 
         <div className="text-center">
           <h2
 
-            className={` text-5xl font-bold mb-4 font-serif`}
+            className={` text-6xl font-medium mb-4 font-serif`}
           >
             Join our waitlist<span className='text-primary'>*</span>
           </h2>
@@ -126,21 +128,31 @@ const Page = () => {
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        className="flex  space-y-1"
+                        className="grid grid-cols-2 gap-3"
+                        defaultValue="android"
                       >
-                        {[
-                          ["Android", "android"],
-                          ["iOS", "ios"],
-                        ].map((option, index) => (
-                          <FormItem className="flex items-center space-x-3 space-y-0" key={index}>
-                            <FormControl>
-                              <RadioGroupItem value={option[1]} />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {option[0]}
-                            </FormLabel>
-                          </FormItem>
-                        ))}
+                        {/* Android */}
+                        <div className="relative flex cursor-pointer flex-col items-center gap-3 rounded-md border border-input px-2 py-3 text-center shadow-xs transition-[color,box-shadow] outline-none has-focus-visible:border-ring has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50 has-data-[state=checked]:border-primary/50">
+                          <RadioGroupItem id={`${id}-android`} value="android" className="sr-only" />
+                          <RiAndroidLine className="opacity-60" size={20} aria-hidden="true" />
+                          <label
+                            htmlFor={`${id}-android`}
+                            className="cursor-pointer text-xs leading-none font-medium text-foreground after:absolute after:inset-0"
+                          >
+                            Android
+                          </label>
+                        </div>
+                        {/* iOS */}
+                        <div className="relative flex cursor-pointer flex-col items-center gap-3 rounded-md border border-input px-2 py-3 text-center shadow-xs transition-[color,box-shadow] outline-none has-focus-visible:border-ring has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50 has-data-[state=checked]:border-primary/50">
+                          <RadioGroupItem id={`${id}-ios`} value="ios" className="sr-only" />
+                          <RiAppleLine className="opacity-60" size={20} aria-hidden="true" />
+                          <label
+                            htmlFor={`${id}-ios`}
+                            className="cursor-pointer text-xs leading-none font-medium text-foreground after:absolute after:inset-0"
+                          >
+                            iOS
+                          </label>
+                        </div>
                       </RadioGroup>
                     </FormControl>
                     {/* <FormDescription></FormDescription> */}

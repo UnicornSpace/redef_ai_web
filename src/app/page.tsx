@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import React from 'react'
 import { FiArrowRight } from "react-icons/fi";
@@ -10,11 +9,7 @@ import Image from 'next/image';
 
 const page = async () => {
   // posthog.capture('my event', { property: 'value' })
-  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!)
-  const { data, error } = await supabase
-    .from('task')
-    .select()
-  console.log(data)
+
   return (
     <div className="max-w-5xl mx-auto">
       <main className='flex flex-col items-center justify-center min-h-[80dvh]  gap-6 '>
