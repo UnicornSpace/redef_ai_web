@@ -23,9 +23,10 @@ import {
 } from "@/components/ui/radio-group"
 const formSchema = z.object({
   email: z.string(),
-  preferred_device: z.string().optional()
+  preferred_device: z.string().describe("Please enter your device preference")  
 });
 import { FaCheckCircle } from "react-icons/fa";
+import Image from 'next/image';
 
 const Page = () => {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -147,8 +148,32 @@ const Page = () => {
                   </FormItem>
                 )}
               />
+              {/* <Button type="submit" className='rounded-l-none rounded-r-full text-white'>  Invite</Button> */}
             </form>
           </Form>}
+        <div className="flex justify-center -ml-6 max-h-64 w-full mx-auto max-w-xl mt-12  ">
+          <Image
+            src="/images/tasks.png"
+            alt="Task Management"
+            width={120}
+            height={120}
+            className="object-contain -rotate-12 -mr-12 animate-bounce "
+          />
+          <Image
+            src="/images/calendar.png"
+            alt="Task Management"
+            width={120}
+            height={120}
+            className="object-contain animate-bounce"
+          />
+          <Image
+            src="/images/calendar_with_clouds.png"
+            alt="Task Management"
+            width={75}
+            height={75}
+            className="object-contain rotate-12 -ml-6 animate-bounce" 
+          />
+        </div>
       </div>
 
     </div>
