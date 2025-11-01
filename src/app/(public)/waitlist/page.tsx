@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/radio-group"
 import { RiAndroidLine, RiAppleLine } from "react-icons/ri"
 const formSchema = z.object({
-  email: z.string(),
-  preferred_device: z.string().describe("Please enter your device preference")  
+  email: z.string().min(1, "Email is required"),
+  preferred_device: z.string().min(1, "Please select a device preference")
 });
 import { FaCheckCircle } from "react-icons/fa";
 import Image from 'next/image';
@@ -33,7 +33,10 @@ const Page = () => {
   const id = useId()
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-
+    defaultValues: {
+      email: "",
+      preferred_device: "android"
+    }
   })
 
   const [isEmailSent, setIsEmailSent] = useState(false);
@@ -41,9 +44,9 @@ const Page = () => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       console.log(values);
-      const res = await waitlistAction({
+        const res = await waitlistAction({
         email: values.email,
-        preferred_device: values.preferred_device || ""
+        preferred_device: values.preferred_device
       })
       if (!res.success) {
         toast.error(`Failed to join the waitlist: ${res.error}`);
@@ -183,7 +186,7 @@ const Page = () => {
             alt="Task Management"
             width={75}
             height={75}
-            className="object-contain rotate-12 -ml-6 animate-bounce" 
+            className="object-contain rotate-12 -ml-6 animate-bounce"
           />
         </div>
       </div>

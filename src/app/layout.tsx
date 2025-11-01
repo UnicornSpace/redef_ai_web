@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/components/header";
 
 const geistSans = Source_Serif_4({
@@ -9,19 +9,23 @@ const geistSans = Source_Serif_4({
   subsets: ["latin"],
 });
 
-const geistMono = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+// const geistMono = Inter({
+//   variable: "--font-inter",
+//   subsets: ["latin"],
+// });
+// const geistMono = Inter({
+//   variable: "--font-inter",
+//   subsets: ["latin"],
+// });
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
 //   subsets: ["latin"],
 // });
 
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "Redef AI",
@@ -37,8 +41,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#F1EDE7]`}
-      >      <Navbar />
-
+      >
         {children}
         <Toaster />
       </body>
