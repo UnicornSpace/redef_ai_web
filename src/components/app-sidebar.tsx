@@ -26,6 +26,7 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { MdOutlineSettings } from "react-icons/md";
@@ -46,6 +47,7 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
+import Link from "next/link";
 // This is sample data.
 const data = {
   user: {
@@ -175,15 +177,36 @@ const data = {
     },
   ],
 };
+import { MdRateReview } from "react-icons/md";
+import CollectFeedback from "./collect-feedback";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const {
+    state,
+    open,
+    setOpen,
+    openMobile,
+    setOpenMobile,
+    isMobile,
+    toggleSidebar,
+  } = useSidebar();
+  console.table({
+    state,
+    open,
+    setOpen,
+    openMobile,
+    setOpenMobile,
+    isMobile,
+    toggleSidebar,
+  });
+  // setOpenMobile(true);
   return (
     <Sidebar
-      collapsible="icon"
+      collapsible="offcanvas"
       {...props}
-      className="rounded-4xl w-64 border-r bg-[#F1EDE7] border-neutral-300 "
+      className="rounded-4xl w-64 border-r bg-[#F7F5F3] border-neutral-300 "
     >
-      <SidebarHeader className="bg-[#F1EDE7] flex justify-between flex-row items-center pt-4">
+      <SidebarHeader className="bg-[#F7F5F3] flex justify-between flex-row items-center pt-4">
         {/* <TeamSwitcher teams={data.teams} /> */}
         {/* <SidebarMenu>
             <SidebarMenuItem>
@@ -195,21 +218,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu> */}
-        <Image src={"/logo.png"} height={48} width={48} alt="" />
+        <Link href="/talk">
+          <Image src={"/logo.png"} height={48} width={48} alt="" />
+        </Link>
         {/* <SidebarTrigger className="-ml-1" /> */}
 
         {/* <div>Logo</div> */}
       </SidebarHeader>
-      <SidebarContent className="bg-[#F1EDE7] pt-4 ">
+      <SidebarContent className="bg-[#F7F5F3] pt-4 ">
         <SidebarGroup className="flex justify-center">
           {/* <SidebarGroupLabel>Platform</SidebarGroupLabel> */}
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton className=" " tooltip={"Discover"}>
-                <BsStars className="text-green-950 size-7! " />
-                <span className="text-base -text-[#6B6255] text-black">
-                  Discover
-                </span>
+              <SidebarMenuButton className=" " tooltip={"Discover"} asChild>
+                <Link href="/discover">
+                  <BsStars className="text-green-950 size-7! " />
+                  <span className="text-base -text-[#6B6255] text-black">
+                    Discover
+                  </span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -217,13 +244,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* <NavMain items={data.navMain} /> */}
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
-      <SidebarFooter className="bg-[#F1EDE7] pb-4 pl-3">
+      <SidebarFooter className="bg-[#F7F5F3] pb-4 pl-3 space-y-4">
         {/* <NavUser user={data.user} /> */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={"Settings"}>
-              <MdOutlineSettings className="text-green-950 size-6! " />
-              <span className="text-lg text-[6b6255]">title</span>
+            <SidebarMenuButton tooltip={"Settings"} asChild>
+              <Link href="/profile/account">
+                <MdOutlineSettings className="text-green-950 size-6! " />
+                <span className="text-lg text-[6b6255]">Setting</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

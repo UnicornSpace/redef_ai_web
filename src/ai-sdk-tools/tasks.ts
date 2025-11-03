@@ -19,7 +19,7 @@ export const getTasksTool = tool({
         isCompleted: z.boolean().default(false).optional().describe("hey use this as true when user wants incomplete tasks")
     }),
     execute: async ({ isCompleted }) => {
-        const supabase = await createClient()   
+        const supabase = await createClient()
         const { data, error } = await supabase
             .from('tasks')
             .select().eq("is_completed", isCompleted)
@@ -87,6 +87,7 @@ export const addTasksTool = tool({
 
         console.log("name", name)
         console.log("user", user.user.id)
+        console.table(user)
         const { error } = await supabase
             .from('tasks')
             .insert({ name: name, user_id: user.user.id })
@@ -114,13 +115,13 @@ function formatTasks(tasks) {
         acc[category].push({ id: task.id, name: task.name })
         return acc
     }, {})
-    
+
     // Convert to formatted string
     const formatted = Object.entries(grouped)
-    .map(([category, items]) => {
-        const header =
-        category === "General" ? "General" : `${category} category:`
-        // @ts-ignore
+        .map(([category, items]) => {
+            const header =
+                category === "General" ? "General" : `${category} category:`
+            // @ts-ignore
             const list = items.map(item => `- ${item.name} (ID: ${item.id})`).join("\n")
             return `${header}\n${list}`
         })

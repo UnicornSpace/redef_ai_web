@@ -22,9 +22,9 @@ export default async function ({ children }: { children: ReactNode }) {
   }
   return (
     <div>
-      <SidebarProvider open={false}>
+      <SidebarProvider >
         <AppSidebar />
-        {/* <SidebarInset className="bg-[#F1EDE7]"> */}
+        {/* <SidebarInset className="bg-[#F7F5F3]"> */}
         {/* <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2 px-4">
               <SidebarTrigger className="-ml-1" />

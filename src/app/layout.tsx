@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import Navbar from "@/components/header";
 
 const geistSans = Source_Serif_4({
   variable: "--font-source-serif-4",
@@ -40,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#F1EDE7]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased  bg-[#F7F5F3]`}
       >
         {children}
         <Toaster />
