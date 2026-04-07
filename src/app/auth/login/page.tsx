@@ -28,7 +28,9 @@ export default function Page() {
                 // style={{ backgroundColor: "#3F3FF3" }}
               ></div>
             </div>
-            <h1 className="text-xl font-semibold text-white">Frello</h1>
+            <h1 className="text-xl font-semibold text-white">
+              RedefAI
+            </h1>
           </div>
 
           <div className="flex-1 flex flex-col justify-center">
@@ -41,10 +43,10 @@ export default function Page() {
           </div>
 
           <div className="flex justify-between items-center text-white/70 text-sm">
-            <span>Copyright © 2025 Frello Enterprises LTD.</span>
+            {/* <span>Copyright © 2025 RedefAI Enterprises LTD.</span>
             <span className="cursor-pointer hover:text-white/90">
               Privacy Policy
-            </span>
+            </span> */}
           </div>
         </div>
       </div>
@@ -58,7 +60,7 @@ export default function Page() {
             >
               <div className="w-4 h-4 bg-white rounded-sm"></div>
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Frello</h1>
+            <h1 className="text-xl font-semibold text-foreground">RedefAI</h1>
           </div>
 
           <div className="space-y-6">
@@ -81,7 +83,7 @@ export default function Page() {
                 {currentView === "login" &&
                   "Enter your email and password to access your account."}
                 {currentView === "register" &&
-                  "Create a new account to get started with Frello."}
+                  "Create a new account to get started with RedefAI."}
                 {currentView === "forgot" &&
                   "Enter your email address and we'll send you a reset link."}
               </p>

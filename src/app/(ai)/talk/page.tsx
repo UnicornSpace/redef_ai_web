@@ -78,7 +78,7 @@ export default function Chat() {
   return (
     <div className="flex flex-col w-full max-w-3xl pt-4 md:pt-24 py-24 px-4  mx-auto stretch">
       {/* <SidebarInset className="bg-[#F7F5F3]"> */}
-      <header className="flex  h-12 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <header className="flex md:hidden h-12 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         {/* <SidebarTrigger className="-ml-1" /> */}
         <Image src={"/logo.png"} height={48} width={48} alt="" />
         <SidebarTrigger className="-ml-1" />
@@ -166,7 +166,7 @@ export default function Chat() {
       <section
         className={cn(
           `fixed bottom-0 re transition-all duration-150 animate-in`,
-          messages.length == 0 && "static"
+          messages.length == 0 && "static" his is other file which not shot be touch NamedNodeMap
         )}
       >
         <form

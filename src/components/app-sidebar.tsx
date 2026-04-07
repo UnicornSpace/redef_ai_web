@@ -202,7 +202,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // setOpenMobile(true);
   return (
     <Sidebar
-      collapsible="offcanvas"
+      collapsible="icon"
       {...props}
       className="rounded-4xl w-64 border-r bg-[#F7F5F3] border-neutral-300 "
     >
