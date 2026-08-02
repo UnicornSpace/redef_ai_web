@@ -1,7 +1,7 @@
 "use client";
 import { LoginForm } from "@/components/login-form";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,7 +88,9 @@ export default function Page() {
                   "Enter your email address and we'll send you a reset link."}
               </p>
             </div>
-                  <LoginForm/>
+                  <Suspense fallback={null}>
+                    <LoginForm/>
+                  </Suspense>
             {/* {currentView !== "forgot" && (
               <>
                 <div className="relative">

@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { streamText, UIMessage, convertToModelMessages, tool, stepCountIs } from 'ai';
 import { createClient } from '@/lib/server';
-import { addTasksTool, getSecretPinTool, getTasksTool, markTaskAsCompletedTool } from '@/ai-sdk-tools/tasks';
+import { addTasksTool, getSecretPinTool, getTasksTool, markTaskAsCompletedTool } from '@/lib/ai-sdk-tools/tasks';
 import { NextResponse } from 'next/server';
 
 // Allow streaming responses up to 30 seconds

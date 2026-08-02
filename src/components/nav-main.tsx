@@ -37,35 +37,29 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
-          <Collapsible
-            key={item.title}
-            asChild
-            defaultOpen={item.isActive}
-            className="group/collapsible"
-          >
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip={item.title}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                </SidebarMenuButton>
+          <SidebarMenuItem key={item.title}>
+            <Collapsible defaultOpen={item.isActive} className="group/collapsible">
+              <CollapsibleTrigger
+                render={<SidebarMenuButton tooltip={item.title} />}
+              >
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
-                          <span>{subItem.title}</span>
-                        </a>
+                      {/* biome-ignore lint/a11y/useAnchorContent: content is the component's children, composed onto this <a> via Base UI's render prop */}
+                      <SidebarMenuSubButton render={<a href={subItem.url} />}>
+                        <span>{subItem.title}</span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}
                 </SidebarMenuSub>
               </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+            </Collapsible>
+          </SidebarMenuItem>
         ))}
       </SidebarMenu>
     </SidebarGroup>

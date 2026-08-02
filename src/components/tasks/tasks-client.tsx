@@ -1,0 +1,286 @@
+"use client";
+
+import { ListChecks, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
+import {
+  createTask,
+  deleteTask,
+  toggleTaskCompleted,
+  updateTaskDueDate,
+} from "@/actions/tasks";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
+import type { Task } from "@/lib/types/productivity";
+import { cn } from "@/lib/utils";
+
+function uid(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+}
+
+type Filter = "active" | "all" | "completed";
+
+export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [filter, setFilter] = useState<Filter>("active");
+  const [, startTransition] = useTransition();
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) if (t.category) set.add(t.category);
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const filtered = useMemo(() => {
+    if (filter === "active") return tasks.filter((t) => !t.is_completed);
+    if (filter === "completed") return tasks.filter((t) => t.is_completed);
+    return tasks;
+  }, [tasks, filter]);
+
+  const grouped = useMemo(() => {
+    const groups = new Map<string, Task[]>();
+    for (const t of filtered) {
+      const key = t.category?.trim() || "General";
+      const list = groups.get(key) ?? [];
+      list.push(t);
+      groups.set(key, list);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      if (a === "General") return 1;
+      if (b === "General") return -1;
+      return a.localeCompare(b);
+    });
+  }, [filtered]);
+
+  const activeCount = tasks.filter((t) => !t.is_completed).length;
+
+  function handleAdd() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const trimmedCategory = category.trim() || null;
+    const optimistic: Task = {
+      id: uid(),
+      user_id: null,
+      name: trimmed,
+      category: trimmedCategory,
+      due_date: dueDate || null,
+      is_completed: false,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setTasks((prev) => [...prev, optimistic]);
+    setName("");
+    setCategory("");
+    setDueDate("");
+    startTransition(async () => {
+      const res = await createTask({
+        name: trimmed,
+        category: trimmedCategory,
+        dueDate: optimistic.due_date,
+      });
+      if (res.error) {
+        setTasks((prev) => prev.filter((t) => t.id !== optimistic.id));
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleToggle(task: Task) {
+    const nextCompleted = !task.is_completed;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id ? { ...t, is_completed: nextCompleted } : t,
+      ),
+    );
+    startTransition(async () => {
+      const res = await toggleTaskCompleted(task.id, nextCompleted);
+      if (res.error) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? { ...t, is_completed: task.is_completed } : t,
+          ),
+        );
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleDelete(task: Task) {
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    startTransition(async () => {
+      const res = await deleteTask(task.id);
+      if (res.error) {
+        setTasks((prev) => [...prev, task]);
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleDueDateChange(task: Task, nextDate: string) {
+    const previous = task.due_date;
+    const value = nextDate || null;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, due_date: value } : t)),
+    );
+    startTransition(async () => {
+      const res = await updateTaskDueDate(task.id, value);
+      if (res.error) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? { ...t, due_date: previous } : t,
+          ),
+        );
+        toast.error(res.error);
+      }
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-5 px-4 pb-16 md:px-8">
+      <div className="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-3 sm:flex-row sm:items-center">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAdd();
+          }}
+          placeholder="Add a task..."
+          className="flex-1"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+            }}
+            placeholder="Category (optional)"
+            className="w-36 sm:w-44"
+            list="task-categories"
+          />
+          <datalist id="task-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <Input
+            type="date"
+            nativeInput
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="w-36"
+          />
+          <Button onClick={handleAdd} disabled={!name.trim()}>
+            <Plus />
+            Add
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          value={filter}
+          onValueChange={(value) => setFilter(value as Filter)}
+        >
+          <TabsList>
+            <TabsTab value="active">Active</TabsTab>
+            <TabsTab value="all">All</TabsTab>
+            <TabsTab value="completed">Completed</TabsTab>
+          </TabsList>
+        </Tabs>
+        <span className="text-sm text-body-muted">
+          {activeCount} left
+        </span>
+      </div>
+
+      {grouped.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ListChecks />
+            </EmptyMedia>
+            <EmptyTitle>
+              {filter === "completed" ? "Nothing completed yet" : "All clear"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {filter === "completed"
+                ? "Finished tasks will show up here."
+                : "Add your first task above to get started."}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {grouped.map(([categoryLabel, items]) => (
+            <div key={categoryLabel} className="flex flex-col gap-1">
+              <h2 className="px-2 text-xs font-bold uppercase tracking-wide text-body-muted">
+                {categoryLabel}
+              </h2>
+              <div className="rounded-2xl border border-line bg-paper">
+                {items.map((task, i) => (
+                  <div
+                    key={task.id}
+                    className={cn(
+                      "flex flex-wrap items-center gap-3 px-3 py-2.5",
+                      i !== items.length - 1 && "border-b border-line",
+                    )}
+                  >
+                    <Checkbox
+                      checked={task.is_completed}
+                      onCheckedChange={() => handleToggle(task)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(task)}
+                      className={cn(
+                        "min-w-0 flex-1 text-left text-sm text-ink",
+                        task.is_completed &&
+                          "text-body-muted line-through",
+                      )}
+                    >
+                      {task.name}
+                    </button>
+                    <Input
+                      type="date"
+                      nativeInput
+                      size="sm"
+                      value={task.due_date ?? ""}
+                      onChange={(e) =>
+                        handleDueDateChange(task, e.target.value)
+                      }
+                      className="w-32 shrink-0"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDelete(task)}
+                      aria-label={`Delete ${task.name}`}
+                      className="shrink-0 text-body-muted"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

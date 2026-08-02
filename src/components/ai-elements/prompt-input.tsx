@@ -24,7 +24,6 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import {
@@ -37,6 +36,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -294,21 +294,23 @@ export function PromptInputAttachment({
       ) : (
         <div className="flex size-full max-w-full cursor-pointer items-center justify-start gap-2 overflow-hidden px-2 text-muted-foreground">
           <PaperclipIcon className="size-4 shrink-0" />
-          <Tooltip delayDuration={400}>
-            <TooltipTrigger className="min-w-0 flex-1">
-              <h4 className="w-full truncate text-left font-medium text-sm">
-                {data.filename || "Unknown file"}
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-muted-foreground text-xs">
-                <h4 className="max-w-[240px] overflow-hidden whitespace-normal break-words text-left font-semibold text-sm">
+          <TooltipProvider delay={400}>
+            <Tooltip>
+              <TooltipTrigger className="min-w-0 flex-1">
+                <h4 className="w-full truncate text-left font-medium text-sm">
                   {data.filename || "Unknown file"}
                 </h4>
-                {data.mediaType && <div>{data.mediaType}</div>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-muted-foreground text-xs">
+                  <h4 className="max-w-[240px] overflow-hidden whitespace-normal break-words text-left font-semibold text-sm">
+                    {data.filename || "Unknown file"}
+                  </h4>
+                  {data.mediaType && <div>{data.mediaType}</div>}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
       <Button
@@ -920,7 +922,7 @@ export const PromptInputTools = ({
   <div className={cn("flex items-center gap-1", className)} {...props} />
 );
 
-export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton>;
+export type PromptInputButtonProps = ComponentProps<typeof Button>;
 
 export const PromptInputButton = ({
   variant = "ghost",
@@ -932,7 +934,7 @@ export const PromptInputButton = ({
     size ?? (Children.count(props.children) > 1 ? "sm" : "icon-sm");
 
   return (
-    <InputGroupButton
+    <Button
       className={cn(className)}
       size={newSize}
       type="button"
@@ -984,7 +986,7 @@ export const PromptInputActionMenuItem = ({
 // Note: Actions that perform side-effects (like opening a file dialog)
 // are provided in opt-in modules (e.g., prompt-input-attachments).
 
-export type PromptInputSubmitProps = ComponentProps<typeof InputGroupButton> & {
+export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
   status?: ChatStatus;
 };
 
@@ -1007,7 +1009,7 @@ export const PromptInputSubmit = ({
   }
 
   return (
-    <InputGroupButton
+    <Button
       aria-label="Submit"
       className={cn(className)}
       size={size}
@@ -1016,7 +1018,7 @@ export const PromptInputSubmit = ({
       {...props}
     >
       {children ?? Icon}
-    </InputGroupButton>
+    </Button>
   );
 };
 
@@ -1319,10 +1321,9 @@ export const PromptInputTabItem = ({
 
 export type PromptInputCommandProps = ComponentProps<typeof Command>;
 
-export const PromptInputCommand = ({
-  className,
-  ...props
-}: PromptInputCommandProps) => <Command className={cn(className)} {...props} />;
+export const PromptInputCommand = (props: PromptInputCommandProps) => (
+  <Command {...props} />
+);
 
 export type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
 

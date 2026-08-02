@@ -1,20 +1,20 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/client";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { signInWithOAuth } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createClient } from "@/lib/client";
+import { cn } from "@/lib/utils";
+
+function isSafeReturnPath(value: string | null): value is string {
+  // only allow relative paths, never full URLs — prevents open-redirect abuse
+  return !!value && value.startsWith("/") && !value.startsWith("//");
+}
+// import { supabase } from "@/lib/supabase-client";
 
 export function LoginForm({
   className,
@@ -25,6 +25,14 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = isSafeReturnPath(redirectParam)
+    ? redirectParam
+    : "/app/talk";
+  const signUpHref = isSafeReturnPath(redirectParam)
+    ? `/auth/sign-up?redirect=${encodeURIComponent(redirectParam)}`
+    : "/auth/sign-up";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +46,7 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/talk");
+      router.push(redirectTo);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -93,11 +100,18 @@ export function LoginForm({
         </div>
         <div className="mt-4 text-center text-sm">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/sign-up" className="underline underline-offset-4">
+          <Link href={signUpHref} className="underline underline-offset-4">
             Sign up
           </Link>
         </div>
       </form>
+      <button
+        type="button"
+        onClick={() => signInWithOAuth("google")}
+        className="rounded border border-gray-300 px-4 py-2 text-black hover:bg-gray-100 transition"
+      >
+        Sign in with Google
+      </button>
       {/* </CardContent>
       </Card> */}
     </div>

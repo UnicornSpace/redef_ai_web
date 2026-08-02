@@ -22,6 +22,8 @@
     "@magicui": "https://magicui.design/r/{name}.json",
     "@supabase": "https://supabase.com/ui/r/{name}.json",
     "@ai-elements": "https://registry.ai-sdk.dev/{name}.json",
-    "@bundui": "https://bundui.io/api/registry/{name}.json"
+    "@bundui": "https://bundui.io/api/registry/{name}.json",
+    "@coss": "https://coss.com/ui/r/{name}.json",
+    "@nusaiba": "https://nusaiba.dev/r/base-nova/{name}.json"
   }
 }
