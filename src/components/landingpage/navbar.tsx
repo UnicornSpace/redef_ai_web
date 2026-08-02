@@ -36,18 +36,24 @@ const Navbar = () => {
                   Pricing
                 </Link>
               </div> */}
-            <div className="flex justify-start items-center">
+            <div className="flex justify-start items-center gap-3">
               <Link
-                href={"/waitlist"}
+                href={"/tools"}
                 className="flex flex-col justify-center text-[rgba(49,45,43,0.80)] text-xs md:text-[13px] font-medium leading-[14px] font-sans"
               >
-                Waitlist
+                Tools
+              </Link>
+              <Link
+                href={"/challenge"}
+                className="flex flex-col justify-center text-[rgba(49,45,43,0.80)] text-xs md:text-[13px] font-medium leading-[14px] font-sans"
+              >
+                Start a Challenge
               </Link>
             </div>
           </div>
         </div>
         <div className="flex ">
-          <Link href={"/talk"} className="hover:cursor-pointer">
+          <Link href={"/app/talk"} className="hover:cursor-pointer">
             <Button
               variant={"secondary"}
               className="rounded-2xl hover:cursor-pointer"

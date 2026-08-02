@@ -1,0 +1,331 @@
+/* ============================================================
+   FAMILY THEME — experiment copy of globals.css token system
+   restyled with family.co branding. Fully scoped under `.family`
+   so it never leaks into the rest of the app.
+   ============================================================ */
+
+.family {
+  /* ---- core tokens (mirrors globals.css naming) ---- */
+  --background: #ffffff;
+  --foreground: #1c1b1a;
+  --card: #ffffff;
+  --card-foreground: #1c1b1a;
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f4ef;
+  --secondary-foreground: #121212;
+  --muted: #f6f4ef;
+  --muted-foreground: rgba(71, 70, 69, 0.6);
+  --accent: #ff3e00;
+  --border: rgba(0, 0, 0, 0.06);
+  --radius: 1rem;
+  --radius-pill: 32px;
+
+  /* ---- family.co brand palette ---- */
+  --blue: #1a88f8;
+  --green: #00ca48;
+  --orange: #ff5c16;
+  --gold: #d7a013;
+  --red: #f9503d;
+  --yellow: #febe44;
+  --purple: #a45ff9;
+  --beige: #f6f4ef;
+  --body: #474645;
+  --body-muted: rgba(71, 70, 69, 0.55);
+  --gray: #747484;
+  --gray-light: #eceae4;
+
+  /* ---- in-app accent colors (used by mock UI) ---- */
+  --app-blue: #4dafff;
+  --app-green: #34c759;
+  --app-pink: #f6538e;
+  --app-gray: #747484;
+
+  /* ---- illustration / graphic colors ---- */
+  --graphic-yellow: #febe44;
+  --graphic-yellow-pale: #fdf3dc;
+  --graphic-blue: #4dafff;
+  --graphic-blue-alt: #8ecbff;
+  --graphic-green: #32b06b;
+  --graphic-orange: #ff7448;
+  --graphic-stone: #eae5da;
+  --graphic-gray: #ccd5dc;
+  --graphic-gold: #eda42c;
+  --graphic-gold-alt: #dfa25b;
+  --graphic-black: #313131;
+
+  /* ---- typography ---- */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Helvetica, "Apple Color Emoji", Arial, sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Helvetica, "Apple Color Emoji", Arial, sans-serif;
+}
+
+/* ---- full-bleed overlay root (escapes the (public) layout shell) ---- */
+.family-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+  scroll-behavior: smooth;
+}
+
+.family * {
+  box-sizing: border-box;
+}
+
+/* ---- layout ---- */
+.f-container {
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.f-hr {
+  border: 0;
+  height: 1px;
+  background: var(--gray-light);
+  margin: 0;
+}
+
+/* ---- typography ---- */
+.f-h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(2.75rem, 6.2vw, 4.25rem);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.f-h2 {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3.05rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.f-h2 .f-dim,
+.f-h1 .f-dim {
+  color: rgba(28, 27, 26, 0.35);
+}
+
+.f-lede {
+  font-size: 1.155rem;
+  line-height: 1.55;
+  font-weight: 500;
+  color: var(--body-muted);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.f-eyebrow {
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.f-body {
+  font-size: 0.965rem;
+  line-height: 1.6;
+  font-weight: 450;
+  color: var(--body-muted);
+  margin: 0;
+}
+
+.f-panel-title {
+  font-size: 1.06rem;
+  font-weight: 650;
+  color: var(--foreground);
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+/* ---- buttons ---- */
+.f-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.45rem;
+  border-radius: var(--radius-pill);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: 0;
+  text-decoration: none;
+  transition: transform 0.18s ease, filter 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.f-btn:active {
+  transform: scale(0.97);
+}
+
+.f-btn-dark {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.f-btn-dark:hover {
+  filter: brightness(1.25);
+}
+
+.f-btn-beige {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.f-btn-beige:hover {
+  background: #efece4;
+}
+
+.f-btn-white {
+  background: #ffffff;
+  color: var(--secondary-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.f-btn-white:hover {
+  filter: brightness(0.97);
+}
+
+/* ---- panels ---- */
+.f-panel {
+  background: var(--beige);
+  border-radius: 30px;
+  overflow: hidden;
+}
+
+/* ---- nav ---- */
+.f-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.f-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.94rem;
+  font-weight: 550;
+  color: rgba(28, 27, 26, 0.62);
+  text-decoration: none;
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.f-nav-link:hover {
+  color: var(--foreground);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* ---- marquees ---- */
+@keyframes f-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.f-marquee {
+  overflow: hidden;
+  position: relative;
+}
+
+.f-marquee-track {
+  display: flex;
+  width: fit-content;
+  animation: f-marquee var(--f-marquee-duration, 60s) linear infinite;
+}
+
+.f-marquee-track.f-reverse {
+  animation-direction: reverse;
+}
+
+.f-marquee:hover .f-marquee-track {
+  animation-play-state: paused;
+}
+
+/* ---- misc animation helpers ---- */
+@keyframes f-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.f-spinner {
+  animation: f-spin 0.9s linear infinite;
+}
+
+@keyframes f-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* ---- edge fades for overflowing graphics ---- */
+.f-fade-r::after,
+.f-fade-l::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.f-fade-r::after {
+  right: 0;
+  background: linear-gradient(to left, var(--beige), rgba(246, 244, 239, 0));
+}
+
+.f-fade-l::before {
+  left: 0;
+  background: linear-gradient(to right, var(--beige), rgba(246, 244, 239, 0));
+}
+
+/* ---- links inside prose ---- */
+.f-body a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 550;
+}
+
+.f-body a:hover {
+  text-decoration: underline;
+}
+
+/* ---- selection flair ---- */
+.family ::selection {
+  background: rgba(26, 136, 248, 0.18);
+}

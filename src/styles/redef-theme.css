@@ -1,0 +1,417 @@
+/* ============================================================
+   REDEF THEME — playful landing experiment
+   A Redef AI–flavored copy of the globals.css token system,
+   in the family.co visual language, tuned with Apple-design
+   principles (fluid motion, translucent chrome, optical type).
+   Fully scoped under `.redef` so it never leaks into the app.
+   ============================================================ */
+
+.redef {
+  /* ---- core tokens (mirrors globals.css naming) ---- */
+  --background: #fdfcfa;
+  --foreground: #2b2620;
+  --card: #ffffff;
+  --primary: #37322f;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f0ea;
+  --secondary-foreground: #37322f;
+  --muted-foreground: rgba(69, 63, 58, 0.6);
+  --border: rgba(55, 50, 47, 0.08);
+  --radius: 1rem;
+  --radius-pill: 32px;
+
+  /* ---- Redef color identity ---- */
+  --rf-green: #59b74f;
+  --rf-green-deep: #3e9a35;
+  --rf-violet: #8b5cf6;
+  --rf-amber: #ffb332;
+  --rf-coral: #ff6a55;
+  --rf-sky: #4da5ff;
+  --paper: #f7f5f3;
+  --ink: #37322f;
+  --body: #4a443f;
+  --body-muted: rgba(74, 68, 63, 0.58);
+  --line: #eae6df;
+
+  /* ---- illustration colors ---- */
+  --g-green: #59b74f;
+  --g-green-soft: #a5d99f;
+  --g-green-pale: #eaf5e7;
+  --g-violet: #8b5cf6;
+  --g-violet-soft: #c4b0fb;
+  --g-amber: #ffb332;
+  --g-amber-pale: #fdf3dc;
+  --g-coral: #ff6a55;
+  --g-sky: #4da5ff;
+  --g-stone: #ece7de;
+  --g-ink: #313131;
+
+  /* ---- typography ---- */
+  --font-sans:
+    "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    "Apple Color Emoji", Arial, sans-serif;
+
+  /* ---- sidebar tokens (so shadcn's Sidebar primitives inherit the brand
+     too, for anything that uses the bg-sidebar/etc. Tailwind utilities
+     instead of hardcoded hex) ---- */
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--g-green-pale);
+  --sidebar-accent-foreground: var(--rf-green-deep);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--rf-green);
+}
+
+.redef * {
+  box-sizing: border-box;
+}
+
+/* ---- full-bleed overlay root (escapes the (public) layout shell) ----
+   Use on marketing/content pages that sit inside the OLD (public) layout
+   wrapper and need to visually cover it. NOT for /app — the dashboard
+   needs normal document flow inside its own sidebar shell. ---- */
+.redef-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- normal-flow surface — same tokens/typography, no fixed positioning.
+   Use for /app (product dashboard) where content must flow naturally
+   inside SidebarProvider/SidebarInset rather than covering the viewport. ---- */
+.redef-surface {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- layout ---- */
+.f-container {
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 480px) {
+  .f-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.f-hr {
+  border: 0;
+  height: 1px;
+  background: var(--line);
+  margin: 0;
+}
+
+/* ---- typography (size-specific tracking & leading) ---- */
+.f-h1 {
+  font-size: clamp(2.8rem, 6.4vw, 4.6rem);
+  line-height: 1.01;
+  font-weight: 800;
+  letter-spacing: -0.042em; /* large display: negative tracking */
+  color: var(--ink);
+  margin: 0;
+}
+
+.f-h2 {
+  font-size: clamp(2rem, 4vw, 3.05rem);
+  line-height: 1.07;
+  font-weight: 800;
+  letter-spacing: -0.032em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.f-h2 .f-dim,
+.f-h1 .f-dim {
+  color: rgba(55, 50, 47, 0.34);
+}
+
+.f-lede {
+  font-size: 1.15rem;
+  line-height: 1.55; /* body: comfortable leading, neutral tracking */
+  font-weight: 550;
+  color: var(--body-muted);
+  letter-spacing: -0.008em;
+  margin: 0;
+}
+
+.f-eyebrow {
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+.f-body {
+  font-size: 0.965rem;
+  line-height: 1.62;
+  font-weight: 500;
+  color: var(--body-muted);
+  margin: 0;
+}
+
+.f-panel-title {
+  font-size: 1.07rem;
+  font-weight: 750;
+  color: var(--ink);
+  letter-spacing: -0.018em;
+  margin: 0;
+}
+
+/* animated gradient accent word (magic-ui style) */
+.f-gradient-word {
+  background: linear-gradient(
+    92deg,
+    var(--rf-green) 0%,
+    var(--rf-sky) 28%,
+    var(--rf-violet) 55%,
+    var(--rf-amber) 80%,
+    var(--rf-green) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: f-gradient-pan 7s linear infinite;
+}
+
+@keyframes f-gradient-pan {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+/* ---- buttons: respond on press, instantly ---- */
+.f-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.92rem 1.5rem;
+  border-radius: var(--radius-pill);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  cursor: pointer;
+  border: 0;
+  text-decoration: none;
+  transition:
+    transform 100ms ease-out,
+    filter 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+  white-space: nowrap;
+  font-family: inherit;
+  will-change: transform;
+}
+
+.f-btn:active {
+  transform: scale(0.965); /* feedback on pointer-down, not release */
+  transition-duration: 60ms;
+}
+
+.f-btn-dark {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.08) inset;
+}
+
+.f-btn-dark:hover {
+  filter: brightness(1.35);
+}
+
+.f-btn-beige {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.f-btn-beige:hover {
+  background: #ede9e1;
+}
+
+.f-btn-white {
+  background: #ffffff;
+  color: var(--secondary-foreground);
+  box-shadow: 0 1px 2px rgba(55, 50, 47, 0.08);
+}
+
+.f-btn-white:hover {
+  filter: brightness(0.975);
+}
+
+.f-btn-green {
+  background: var(--rf-green);
+  color: #fff;
+}
+
+.f-btn-green:hover {
+  filter: brightness(1.06);
+}
+
+/* ---- panels ---- */
+.f-panel {
+  background: var(--paper);
+  border-radius: 30px;
+  overflow: hidden;
+}
+
+/* ---- nav: translucent material, content scrolls underneath ---- */
+.f-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(253, 252, 250, 0.62);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* scroll edge effect instead of a hard 1px divider */
+.f-nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(55, 50, 47, 0.05), transparent);
+}
+
+.f-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.94rem;
+  font-weight: 650;
+  color: rgba(55, 50, 47, 0.62);
+  text-decoration: none;
+  padding: 0.42rem 0.68rem;
+  border-radius: 11px;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    transform 100ms ease-out;
+}
+
+.f-nav-link:hover {
+  color: var(--ink);
+  background: rgba(55, 50, 47, 0.05);
+}
+
+.f-nav-link:active {
+  transform: scale(0.96);
+}
+
+/* ---- marquees ---- */
+@keyframes f-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.f-marquee {
+  overflow: hidden;
+  position: relative;
+}
+
+.f-marquee-track {
+  display: flex;
+  width: fit-content;
+  animation: f-marquee var(--f-marquee-duration, 60s) linear infinite;
+}
+
+.f-marquee-track.f-reverse {
+  animation-direction: reverse;
+}
+
+.f-marquee:hover .f-marquee-track {
+  animation-play-state: paused;
+}
+
+/* ---- helper animations ---- */
+@keyframes f-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.f-spinner {
+  animation: f-spin 0.9s linear infinite;
+}
+
+@keyframes f-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.f-eq-bar {
+  transform-origin: center;
+  animation: f-eq 1s ease-in-out infinite;
+}
+
+/* ---- prose links ---- */
+.f-body a {
+  color: var(--rf-green-deep);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.f-body a:hover {
+  text-decoration: underline;
+}
+
+.redef ::selection {
+  background: rgba(89, 183, 79, 0.22);
+}
+
+/* ---- accessibility: gentler equivalents, not dead ones ---- */
+@media (prefers-reduced-motion: reduce) {
+  .redef .f-marquee-track,
+  .redef .f-eq-bar,
+  .redef .f-gradient-word,
+  .redef .f-spinner {
+    animation: none;
+  }
+  /* gradient text still needs a visible fill once the pan stops */
+  .redef .f-gradient-word {
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: var(--rf-green-deep);
+  }
+}
+
+/* biome-ignore lint/correctness/noUnknownMediaFeatureName: prefers-reduced-transparency is a valid Media Queries L5 feature Biome doesn't know yet */
+@media (prefers-reduced-transparency: reduce) {
+  .redef .f-nav {
+    background: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

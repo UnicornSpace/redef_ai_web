@@ -1,258 +1,113 @@
 "use client";
 
-import * as React from "react";
-import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-} from "lucide-react";
+import { Calendar, Timer, Trophy } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type * as React from "react";
 import { BsStars } from "react-icons/bs";
-
-import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
-import { NavUser } from "@/components/nav-user";
-import { TeamSwitcher } from "@/components/team-switcher";
+import { FaTasks } from "react-icons/fa";
+import { FaMoneyBill } from "react-icons/fa6";
+import { MdOutlineSettings } from "react-icons/md";
+import { PiPlantBold } from "react-icons/pi";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
-  SidebarRail,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { ChevronRight, type LucideIcon } from "lucide-react";
-import { MdOutlineSettings } from "react-icons/md";
-
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   SidebarGroup,
-  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarRail,
 } from "@/components/ui/sidebar";
-import Image from "next/image";
-import Link from "next/link";
-// This is sample data.
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+
+const NAV_ITEMS = [
+  { href: "/app/talk", label: "Talk", icon: BsStars, size: "size-7!" },
+  { href: "/app/habits", label: "Habits", icon: PiPlantBold, size: "size-7!" },
+  {
+    href: "/app/personal-finance",
+    label: "Personal Finance",
+    icon: FaMoneyBill,
+    size: "size-7!",
   },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-};
-import { MdRateReview } from "react-icons/md";
-import CollectFeedback from "./collect-feedback";
+  { href: "/app/tasks", label: "Tasks", icon: FaTasks, size: "size-6!" },
+  { href: "/app/deep-work", label: "Deep Work", icon: Timer, size: "size-6!" },
+  { href: "/app/calendar", label: "Calendar", icon: Calendar, size: "size-7!" },
+  {
+    href: "/app/challenges",
+    label: "Challenges",
+    icon: Trophy,
+    size: "size-6!",
+  },
+];
+
+function isActivePath(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const {
-    state,
-    open,
-    setOpen,
-    openMobile,
-    setOpenMobile,
-    isMobile,
-    toggleSidebar,
-  } = useSidebar();
-  console.table({
-    state,
-    open,
-    setOpen,
-    openMobile,
-    setOpenMobile,
-    isMobile,
-    toggleSidebar,
-  });
-  // setOpenMobile(true);
+  const pathname = usePathname();
+
   return (
     <Sidebar
       collapsible="icon"
       {...props}
-      className="rounded-4xl w-64 border-r bg-[#F7F5F3] border-neutral-300 "
+      className="rounded-4xl w-64 border-r bg-sidebar border-sidebar-border"
     >
-      <SidebarHeader className="bg-[#F7F5F3] flex justify-between flex-row items-center pt-4">
-        {/* <TeamSwitcher teams={data.teams} /> */}
-        {/* <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton className=" " tooltip={"Discover"}>
-                <BsStars className="text-green-950 size-7! " />
-                <span className="text-base -text-[#6B6255] text-black">
-                  Discover
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu> */}
-        <Link href="/talk">
-          <Image src={"/logo.png"} height={48} width={48} alt="" />
+      <SidebarHeader className="flex flex-row items-center justify-start gap-2 bg-sidebar pt-4 group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:px-0!">
+        <Link
+          href="/app/talk"
+          className="flex items-center gap-2 pl-1 group-data-[collapsible=icon]:pl-0"
+        >
+          <Image
+            src={"/logo.png"}
+            height={32}
+            width={32}
+            alt=""
+            className="shrink-0"
+          />
+          <span className="text-lg text-sidebar-foreground font-extrabold tracking-tight group-data-[collapsible=icon]:hidden">
+            RedefAI
+          </span>
         </Link>
-        {/* <SidebarTrigger className="-ml-1" /> */}
-
-        {/* <div>Logo</div> */}
       </SidebarHeader>
-      <SidebarContent className="bg-[#F7F5F3] pt-4 ">
+      <SidebarContent className="bg-sidebar pt-8 ">
         <SidebarGroup className="flex justify-center">
-          {/* <SidebarGroupLabel>Platform</SidebarGroupLabel> */}
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton className=" " tooltip={"Discover"} asChild>
-                <Link href="/discover">
-                  <BsStars className="text-green-950 size-7! " />
-                  <span className="text-base -text-[#6B6255] text-black">
-                    Discover
-                  </span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+          <SidebarMenu className="gap-3 ml-2 group-data-[collapsible=icon]:ml-0">
+            {NAV_ITEMS.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    className=" "
+                    tooltip={item.label}
+                    isActive={active}
+                    render={<Link href={item.href} />}
+                  >
+                    <item.icon
+                      className={`text-sidebar-foreground ${item.size} group-data-[collapsible=icon]:size-4.5!`}
+                    />
+                    <span className="text-base text-sidebar-foreground">
+                      {item.label}
+                    </span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarGroup>
-        {/* <NavMain items={data.navMain} /> */}
-        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
-      <SidebarFooter className="bg-[#F7F5F3] pb-4 pl-3 space-y-4">
-        {/* <NavUser user={data.user} /> */}
+      <SidebarFooter className="bg-sidebar pb-4 pl-3 space-y-4 group-data-[collapsible=icon]:pl-0! group-data-[collapsible=icon]:items-center!">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={"Settings"} asChild>
-              <Link href="/profile/account">
-                <MdOutlineSettings className="text-green-950 size-6! " />
-                <span className="text-lg text-[6b6255]">Setting</span>
-              </Link>
+            <SidebarMenuButton
+              tooltip={"Settings"}
+              isActive={isActivePath(pathname, "/app/profile")}
+              render={<Link href="/app/profile/account" />}
+            >
+              <MdOutlineSettings className="text-sidebar-foreground size-6! group-data-[collapsible=icon]:size-4.5!" />
+              <span className="text-lg text-sidebar-foreground">Setting</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
