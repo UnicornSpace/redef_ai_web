@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
+  // Lets a phone on the same LAN hit the dev server's HMR socket during
+  // testing — without this, Next.js silently blocks /_next/webpack-hmr for
+  // any origin other than localhost, which breaks all client-side
+  // interactivity (buttons, drawers, etc.) on that device while dev mode is
+  // otherwise serving pages fine. Update this IP if your machine's LAN
+  // address changes.
+  allowedDevOrigins: ["192.168.31.47"],
+
   // Next.js 16 defaults images.qualities to [75] — preserve the quality
   // values actually used across the app (related-tools, hero-section, tools
   // index) instead of having them silently coerced down to 75.

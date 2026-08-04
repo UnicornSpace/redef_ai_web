@@ -9,6 +9,7 @@ import {
   toggleTaskCompleted,
   updateTaskDueDate,
 } from "@/actions/tasks";
+import { useRegisterFab } from "@/components/app-shell/mobile-fab-context";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +20,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Task } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
@@ -37,7 +45,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [category, setCategory] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("active");
+  const [addOpen, setAddOpen] = useState(false);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const detailTask = tasks.find((t) => t.id === detailTaskId) ?? null;
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -87,6 +99,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
     setName("");
     setCategory("");
     setDueDate("");
+    setAddOpen(false);
     startTransition(async () => {
       const res = await createTask({
         name: trimmed,
@@ -150,9 +163,14 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
     });
   }
 
+  useRegisterFab(
+    { label: "Add task", icon: Plus, onClick: () => setAddOpen(true) },
+    [],
+  );
+
   return (
     <div className="flex flex-col gap-5 px-4 pb-16 md:px-8">
-      <div className="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-3 sm:flex-row sm:items-center">
+      <div className="hidden flex-col gap-2 rounded-2xl border border-line bg-paper p-3 sm:flex-row sm:items-center md:flex">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -191,6 +209,38 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
           </Button>
         </div>
       </div>
+
+      <ResponsiveDialog open={addOpen} onOpenChange={setAddOpen}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Add a task</ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
+          <div className="flex flex-col gap-4 px-6">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Task name"
+            />
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Category (optional)"
+              list="task-categories"
+            />
+            <Input
+              type="date"
+              nativeInput
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+          <ResponsiveDialogFooter>
+            <Button onClick={handleAdd} disabled={!name.trim()}>
+              Add task
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs
@@ -243,10 +293,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     <Checkbox
                       checked={task.is_completed}
                       onCheckedChange={() => handleToggle(task)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <button
                       type="button"
-                      onClick={() => handleToggle(task)}
+                      onClick={() => setDetailTaskId(task.id)}
                       className={cn(
                         "min-w-0 flex-1 text-left text-sm text-ink",
                         task.is_completed &&
@@ -255,25 +306,14 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     >
                       {task.name}
                     </button>
-                    <Input
-                      type="date"
-                      nativeInput
-                      size="sm"
-                      value={task.due_date ?? ""}
-                      onChange={(e) =>
-                        handleDueDateChange(task, e.target.value)
-                      }
-                      className="w-32 shrink-0"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleDelete(task)}
-                      aria-label={`Delete ${task.name}`}
-                      className="shrink-0 text-body-muted"
-                    >
-                      <Trash2 />
-                    </Button>
+                    {task.due_date ? (
+                      <span className="shrink-0 text-xs text-body-muted">
+                        {new Date(`${task.due_date}T00:00:00`).toLocaleDateString(
+                          undefined,
+                          { month: "short", day: "numeric" },
+                        )}
+                      </span>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -281,6 +321,61 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
           ))}
         </div>
       )}
+
+      <ResponsiveDialog
+        open={detailTask !== null}
+        onOpenChange={(open) => !open && setDetailTaskId(null)}
+      >
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
+              {detailTask?.name ?? "Task"}
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
+          {detailTask ? (
+            <div className="flex flex-col gap-4 px-6">
+              {detailTask.category ? (
+                <span className="w-fit rounded-full bg-g-green-pale px-2.5 py-0.5 text-xs font-semibold text-rf-green-deep">
+                  {detailTask.category}
+                </span>
+              ) : null}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-body-muted">
+                  Due date
+                </span>
+                <Input
+                  type="date"
+                  nativeInput
+                  value={detailTask.due_date ?? ""}
+                  onChange={(e) =>
+                    handleDueDateChange(detailTask, e.target.value)
+                  }
+                />
+              </div>
+              <Button
+                variant={detailTask.is_completed ? "secondary" : "default"}
+                onClick={() => handleToggle(detailTask)}
+              >
+                {detailTask.is_completed
+                  ? "Marked complete ✓"
+                  : "Mark complete"}
+              </Button>
+            </div>
+          ) : null}
+          <ResponsiveDialogFooter>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (detailTask) handleDelete(detailTask);
+                setDetailTaskId(null);
+              }}
+            >
+              <Trash2 />
+              Delete task
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   );
 }

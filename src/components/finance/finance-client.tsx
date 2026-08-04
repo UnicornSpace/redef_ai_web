@@ -4,15 +4,8 @@ import { Plus, Trash2, Wallet } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createTransaction, deleteTransaction } from "@/actions/finance";
+import { useRegisterFab } from "@/components/app-shell/mobile-fab-context";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Empty,
   EmptyDescription,
@@ -21,6 +14,14 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from "@/components/ui/responsive-dialog";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Transaction, TransactionType } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
@@ -204,6 +205,11 @@ export function FinanceClient({
     });
   }
 
+  useRegisterFab(
+    { label: "Add transaction", icon: Plus, onClick: () => setOpen(true) },
+    [],
+  );
+
   return (
     <div className="flex flex-col gap-5 px-4 pb-16 md:px-8 mt-6">
       <div className="flex gap-3">
@@ -279,15 +285,17 @@ export function FinanceClient({
       </div>
 
       <div className="flex justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button />}>
+        <ResponsiveDialog open={open} onOpenChange={setOpen}>
+          <ResponsiveDialogTrigger
+            render={<Button className="hidden md:inline-flex" />}
+          >
             <Plus />
             Add transaction
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add a transaction</DialogTitle>
-            </DialogHeader>
+          </ResponsiveDialogTrigger>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>Add a transaction</ResponsiveDialogTitle>
+            </ResponsiveDialogHeader>
             <div className="flex flex-col gap-4 px-6">
               <Tabs
                 value={type}
@@ -362,13 +370,13 @@ export function FinanceClient({
                 placeholder="Description (optional)"
               />
             </div>
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button onClick={handleAdd} disabled={!amount.trim()}>
                 Add
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       </div>
 
       {spaces.length > 0 ? (

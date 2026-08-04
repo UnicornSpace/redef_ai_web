@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import "@/styles/redef-theme.css";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { MobileFabProvider } from "@/components/app-shell/mobile-fab-context";
+import { MobileTabBar } from "@/components/app-shell/mobile-tab-bar";
+import { MobileTopHeader } from "@/components/app-shell/mobile-top-header";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { createClient } from "@/lib/server";
 
 const manrope = Manrope({ subsets: ["latin"], display: "swap" });
@@ -43,19 +46,24 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       : "/auth/login";
     redirect(url);
   }
+  const email = data.claims.user_metadata?.email as string | undefined;
+  const avatarUrl = (data.claims.user_metadata?.avatar_url ??
+    data.claims.user_metadata?.picture) as string | undefined;
+
   return (
     <div className={`redef redef-surface ${manrope.className}`}>
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="flex w-full flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center border-b border-line px-4 md:hidden">
-            <SidebarTrigger className="-ml-1" />
-          </header>
-          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-            {children}
-          </div>
-        </main>
-      </SidebarProvider>
+      <MobileFabProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <main className="flex w-full flex-1 flex-col">
+            <MobileTopHeader avatarUrl={avatarUrl} email={email} />
+            <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col pb-24 md:pb-0">
+              {children}
+            </div>
+          </main>
+          <MobileTabBar />
+        </SidebarProvider>
+      </MobileFabProvider>
     </div>
   );
 }
