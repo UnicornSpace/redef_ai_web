@@ -46,6 +46,20 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims;
   const pathname = request.nextUrl.pathname;
 
+  // Supabase's own OAuth redirect can land the "?code=" exchange on the
+  // wrong URL — e.g. if the exact redirectTo we requested isn't in the
+  // project's Redirect URLs allowlist, Supabase silently falls back to the
+  // Site URL and appends the code there instead of at /auth/callback.
+  // Forward it to the real handler so sign-in still completes either way.
+  if (
+    pathname !== "/auth/callback" &&
+    request.nextUrl.searchParams.has("code")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   // Everything under the marketing site — (public) route group, the
   // homepage, /auth/*, /login — is meant to stay reachable without a
   // session. Rather than trying to enumerate every public path (easy to

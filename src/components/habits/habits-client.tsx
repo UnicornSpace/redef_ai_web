@@ -140,7 +140,7 @@ function HabitHeatmap({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 max-w-80  gap-1">
         {WEEKDAY_LABELS.map((label) => (
           <span
             key={label}
@@ -165,7 +165,7 @@ function HabitHeatmap({
               title={key}
               aria-label={`${isDone ? "Unmark" : "Mark"} ${key}${isToday ? " (today)" : ""}`}
               className={cn(
-                "aspect-square w-full rounded-[4px] border-2 border-transparent transition-[background-color,border-color,scale] active:scale-[0.96]",
+                "aspect-square w-9 rounded-[4px] border-1 border-transparent transition-[background-color,border-color,scale] active:scale-[0.96]",
                 disabled && "opacity-20",
                 !disabled && !isDone && "bg-line hover:bg-body-muted/40",
                 isDone && "bg-rf-green-deep hover:bg-rf-green-deep/80",
@@ -288,7 +288,7 @@ function HabitCard({
   void router;
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-line bg-paper p-4">
+    <div className="flex flex-col gap-4 rounded-xl max-w-sm border border-line bg-paper p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -304,9 +304,9 @@ function HabitCard({
               </span>
             ) : null}
           </div>
-          {habit.description ? (
-            <p className="text-sm text-body-muted">{habit.description}</p>
-          ) : null}
+          {/* {habit.description ? (
+            <p className="text-sm text-body-muted line-clamp-1">{habit.description}</p>
+          ) : null} */}
           {collaborators.length > 0 ? (
             <button
               type="button"
@@ -325,49 +325,51 @@ function HabitCard({
             </button>
           ) : null}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label={`Options for ${habit.name}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "icon-sm" }),
-              "shrink-0 text-body-muted",
-            )}
-          >
-            <MoreVertical />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setDetailsOpen(true)}>
-              View details
-            </DropdownMenuItem>
-            {!habit.isCollaboration ? (
-              <>
-                <DropdownMenuItem onClick={() => setInviteOpen(true)}>
-                  Invite a friend
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-                  Delete
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
+        <div className="flex flex-wrap items-center gap-3">
+          {/* <Button
           variant={isDoneToday ? "secondary" : "default"}
           size="sm"
           onClick={() => handleToggleDate(todayKey)}
         >
           {isDoneToday ? "Marked today ✓" : "Mark today"}
-        </Button>
-        <span className="inline-flex items-center gap-1 text-sm font-semibold text-rf-coral">
-          <Flame size={16} />
-          <span className="tabular-nums">{streak}</span> day
-          {streak === 1 ? "" : "s"} streak
-        </span>
+        </Button> */}
+          <span className={cn("animate-skeleton inline-flex items-center gap-1 text-sm font-semibold", streak > 0 ? "text-rf-coral" : "text-body-muted")}>
+            <Flame size={16} />
+            <span className="tabular-nums">{streak}</span>
+             {/* day */}
+            {/* {streak === 1 ? "" : "s"} streak */}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Options for ${habit.name}`}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "icon-sm" }),
+                "shrink-0 text-body-muted",
+              )}
+            >
+              <MoreVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setDetailsOpen(true)}>
+                View details
+              </DropdownMenuItem>
+              {!habit.isCollaboration ? (
+                <>
+                  <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+                    Invite a friend
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={handleDelete}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>{" "}
+        </div>
       </div>
-
       <HabitHeatmap
         habit={{ ...habit, completed_dates: completedDates }}
         today={today}
@@ -460,7 +462,9 @@ function HabitCard({
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6">
             {habit.description ? (
-              <p className="text-sm text-body-muted">{habit.description}</p>
+              <p className="text-sm line text-body-muted">
+                {habit.description}
+              </p>
             ) : null}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-line p-3">
@@ -595,7 +599,9 @@ export function HabitsClient({
           </TabsList>
         </Tabs>
         <ResponsiveDialog open={open} onOpenChange={setOpen}>
-          <ResponsiveDialogTrigger render={<Button className="hidden md:inline-flex" />}>
+          <ResponsiveDialogTrigger
+            render={<Button className="hidden md:inline-flex" />}
+          >
             <Plus />
             Add habit
           </ResponsiveDialogTrigger>
@@ -666,7 +672,7 @@ export function HabitsClient({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {habits.map((habit) => (
             <HabitCard
               key={habit.id}

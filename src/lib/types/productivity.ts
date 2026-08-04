@@ -93,6 +93,28 @@ export interface Transaction {
   updated_at: string;
 }
 
+export type GoalPeriodType = "weekly" | "21_day" | "monthly" | "custom";
+
+export interface Goal {
+  id: string;
+  user_id: string | null;
+  title: string;
+  period_type: GoalPeriodType;
+  start_date: string;
+  end_date: string;
+  daily_hours_target: number | null;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoalWithProgress extends Goal {
+  habits: { id: string; name: string }[];
+  tasks: { id: string; name: string; is_completed: boolean }[];
+  hoursLogged: number | null;
+  progressPct: number;
+}
+
 export interface Challenge {
   id: string;
   owner_user_id: string | null;
