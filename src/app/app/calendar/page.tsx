@@ -16,6 +16,18 @@ function dateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Every date key from startKey to endKey, inclusive (both "YYYY-MM-DD"). */
+function dateRange(startKey: string, endKey: string): string[] {
+  const cursor = new Date(`${startKey}T00:00:00`);
+  const end = new Date(`${endKey}T00:00:00`);
+  const keys: string[] = [];
+  while (cursor.getTime() <= end.getTime()) {
+    keys.push(dateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
+}
+
 function CalendarSkeleton() {
   return (
     <div className="flex flex-col gap-4 px-4 pb-16 md:px-8">
@@ -72,9 +84,17 @@ async function CalendarData() {
       });
     }
   }
+  const today = dateKey(new Date());
   for (const h of habits) {
-    for (const d of h.completed_dates ?? []) {
-      bucket(d).habits.push({ id: h.id, name: h.name });
+    // A habit is "assigned" for every day in its active range, not just the
+    // days it was actually completed — an open-ended habit's range is
+    // clamped to today since future days haven't happened yet.
+    const startedAt = h.started_at.slice(0, 10);
+    const endAt = h.end_date ? h.end_date.slice(0, 10) : today;
+    if (startedAt > endAt) continue;
+    const completed = new Set(h.completed_dates ?? []);
+    for (const d of dateRange(startedAt, endAt)) {
+      bucket(d).habits.push({ id: h.id, name: h.name, done: completed.has(d) });
     }
   }
   for (const tx of transactions) {

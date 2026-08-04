@@ -16,7 +16,7 @@ export interface CalendarEvent {
 
 export interface DaySummary {
   tasks: { id: string; name: string; completed: boolean }[];
-  habits: { id: string; name: string }[];
+  habits: { id: string; name: string; done: boolean }[];
   financeNet: number;
   financeCount: number;
   workSeconds: number;

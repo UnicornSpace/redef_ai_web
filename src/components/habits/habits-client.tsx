@@ -10,6 +10,7 @@ import {
   toggleCollaboratorDate,
   toggleHabitDate,
 } from "@/actions/habits";
+import { useRegisterFab } from "@/components/app-shell/mobile-fab-context";
 import { AvatarGroup } from "@/components/ui/avatar-group";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -20,6 +21,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from "@/components/ui/responsive-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,7 +100,6 @@ function computeStreak(completed: Set<string>, today: Date): number {
 }
 
 type ViewMode = "weekly" | "monthly";
-type Columns = 2 | 3;
 
 const WEEKS_BY_MODE: Record<ViewMode, number> = { weekly: 1, monthly: 6 };
 const WEEKDAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -510,7 +518,6 @@ export function HabitsClient({
 }) {
   const [habits, setHabits] = useState<HabitListItem[]>(initialHabits);
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
-  const [columns, setColumns] = useState<Columns>(2);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -570,38 +577,32 @@ export function HabitsClient({
     setHabits((prev) => prev.filter((h) => h.id !== id));
   }
 
+  useRegisterFab(
+    { label: "Add habit", icon: Plus, onClick: () => setOpen(true) },
+    [],
+  );
+
   return (
     <div className="flex flex-col gap-5 px-4 pb-16 md:px-8 mt-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Tabs
-            value={viewMode}
-            onValueChange={(value) => setViewMode(value as ViewMode)}
-          >
-            <TabsList>
-              <TabsTab value="weekly">Weekly</TabsTab>
-              <TabsTab value="monthly">Monthly</TabsTab>
-            </TabsList>
-          </Tabs>
-          <Tabs
-            value={String(columns)}
-            onValueChange={(value) => setColumns(Number(value) as Columns)}
-          >
-            <TabsList>
-              <TabsTab value="2">2 columns</TabsTab>
-              <TabsTab value="3">3 columns</TabsTab>
-            </TabsList>
-          </Tabs>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button />}>
+        <Tabs
+          value={viewMode}
+          onValueChange={(value) => setViewMode(value as ViewMode)}
+        >
+          <TabsList>
+            <TabsTab value="weekly">Weekly</TabsTab>
+            <TabsTab value="monthly">Monthly</TabsTab>
+          </TabsList>
+        </Tabs>
+        <ResponsiveDialog open={open} onOpenChange={setOpen}>
+          <ResponsiveDialogTrigger render={<Button className="hidden md:inline-flex" />}>
             <Plus />
             Add habit
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add a habit</DialogTitle>
-            </DialogHeader>
+          </ResponsiveDialogTrigger>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>Add a habit</ResponsiveDialogTitle>
+            </ResponsiveDialogHeader>
             <div className="flex flex-col gap-4 px-6">
               <Input
                 value={name}
@@ -643,13 +644,13 @@ export function HabitsClient({
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button onClick={handleCreate} disabled={!name.trim()}>
                 Add habit
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       </div>
 
       {habits.length === 0 ? (
@@ -665,12 +666,7 @@ export function HabitsClient({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-4",
-            columns === 2 ? "md:grid-cols-2" : "md:grid-cols-3",
-          )}
-        >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {habits.map((habit) => (
             <HabitCard
               key={habit.id}

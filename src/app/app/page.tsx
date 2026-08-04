@@ -49,79 +49,84 @@ function streakFor(dates: string[], today: Date): number {
   return streak;
 }
 
-function MinimalSkeleton() {
+/** Matches the real card's shape so the skeleton-to-content swap is seamless. */
+function DashboardCardSkeleton() {
   return (
-    <div className="flex flex-col gap-3 px-4 pb-10 md:px-8">
-      <Skeleton className="h-24 w-full rounded-2xl" />
-      <Skeleton className="h-24 w-full rounded-2xl" />
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-paper p-5">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-10 shrink-0 rounded-full" />
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3.5 w-32" />
+        </div>
+      </div>
+      <Skeleton className="h-7 w-12" />
     </div>
   );
 }
 
-async function DashboardMinimal() {
-  const [habits, sessions] = await Promise.all([
-    listHabits(),
-    listSessions(60),
-  ]);
-
-  const today = new Date();
-  const todayKey = dateKey(today);
-
+async function DeepWorkTodayCard() {
+  const sessions = await listSessions(60);
+  const todayKey = dateKey(new Date());
   const todaySeconds = sessions
     .filter((s) => dateKey(new Date(s.start_time)) === todayKey)
     .reduce((sum, s) => sum + s.duration_in_seconds, 0);
 
+  return (
+    <Link
+      href="/app/deep-work"
+      className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-paper p-5 transition-colors hover:border-rf-green-deep/40"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-full bg-g-green-pale text-rf-green-deep">
+          <Timer size={20} />
+        </span>
+        <div className="flex flex-col">
+          <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
+            Deep work today
+          </span>
+          <span className="text-sm text-body-muted">
+            Tap to log a focus session
+          </span>
+        </div>
+      </div>
+      <span className="tabular-nums text-2xl font-extrabold text-ink">
+        {todaySeconds === 0 ? "0m" : formatDuration(todaySeconds)}
+      </span>
+    </Link>
+  );
+}
+
+async function HabitStreakCard() {
+  const habits = await listHabits();
+  const today = new Date();
   const habitsWithStreak = habits
     .map((h) => ({ ...h, streak: streakFor(h.completed_dates ?? [], today) }))
     .sort((a, b) => b.streak - a.streak);
   const topHabit = habitsWithStreak[0];
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-10 md:px-8">
-      <Link
-        href="/app/deep-work"
-        className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-paper p-5 transition-colors hover:border-rf-green-deep/40"
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-g-green-pale text-rf-green-deep">
-            <Timer size={20} />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
-              Deep work today
-            </span>
-            <span className="text-sm text-body-muted">
-              Tap to log a focus session
-            </span>
-          </div>
-        </div>
-        <span className="tabular-nums text-2xl font-extrabold text-ink">
-          {todaySeconds === 0 ? "0m" : formatDuration(todaySeconds)}
+    <Link
+      href="/app/habits"
+      className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-paper p-5 transition-colors hover:border-rf-green-deep/40"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-full bg-g-green-pale text-rf-coral">
+          <Flame size={20} />
         </span>
-      </Link>
-
-      <Link
-        href="/app/habits"
-        className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-paper p-5 transition-colors hover:border-rf-green-deep/40"
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-g-green-pale text-rf-coral">
-            <Flame size={20} />
+        <div className="flex flex-col">
+          <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
+            {topHabit ? "Top streak" : "Habits"}
           </span>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
-              {topHabit ? "Top streak" : "Habits"}
-            </span>
-            <span className="text-sm text-body-muted">
-              {topHabit ? topHabit.name : "Start a habit to build a streak"}
-            </span>
-          </div>
+          <span className="text-sm text-body-muted">
+            {topHabit ? topHabit.name : "Start a habit to build a streak"}
+          </span>
         </div>
-        <span className="tabular-nums text-2xl font-extrabold text-ink">
-          {topHabit ? `${topHabit.streak}d` : "—"}
-        </span>
-      </Link>
-    </div>
+      </div>
+      <span className="tabular-nums text-2xl font-extrabold text-ink">
+        {topHabit ? `${topHabit.streak}d` : "—"}
+      </span>
+    </Link>
   );
 }
 
@@ -137,9 +142,14 @@ export default async function DashboardHomePage() {
         title={name ? `Hey ${name}` : "Hey"}
         description="Just the two things that move the needle today."
       />
-      <Suspense fallback={<MinimalSkeleton />}>
-        <DashboardMinimal />
-      </Suspense>
+      <div className="flex flex-col gap-3 px-4 pb-10 md:px-8">
+        <Suspense fallback={<DashboardCardSkeleton />}>
+          <DeepWorkTodayCard />
+        </Suspense>
+        <Suspense fallback={<DashboardCardSkeleton />}>
+          <HabitStreakCard />
+        </Suspense>
+      </div>
     </div>
   );
 }

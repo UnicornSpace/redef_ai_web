@@ -1,20 +1,24 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
-import type { LeaderboardEntry } from "@/actions/challenges";
-import { ChallengesClient } from "@/components/challenges/challenges-client";
-import { LeaderboardClient } from "@/components/challenges/leaderboard-client";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
-import type { Challenge } from "@/lib/types/productivity";
 
 type Tab = "challenges" | "leaderboard";
 
+/**
+ * Both slots are rendered (and their Suspense boundaries start streaming)
+ * immediately regardless of which tab is active — the hidden one is just
+ * CSS-hidden, not unmounted — so switching tabs never waits on a fetch that
+ * could've already been in flight, and both start resolving in parallel
+ * instead of one blocking the other behind a single Promise.all.
+ */
 export function ChallengesTabs({
-  challenges,
-  leaderboard,
+  challengesSlot,
+  leaderboardSlot,
 }: {
-  challenges: Challenge[];
-  leaderboard: LeaderboardEntry[];
+  challengesSlot: ReactNode;
+  leaderboardSlot: ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>("challenges");
 
@@ -28,11 +32,12 @@ export function ChallengesTabs({
           </TabsList>
         </Tabs>
       </div>
-      {tab === "challenges" ? (
-        <ChallengesClient initialChallenges={challenges} />
-      ) : (
-        <LeaderboardClient entries={leaderboard} />
-      )}
+      <div className={tab === "challenges" ? undefined : "hidden"}>
+        {challengesSlot}
+      </div>
+      <div className={tab === "leaderboard" ? undefined : "hidden"}>
+        {leaderboardSlot}
+      </div>
     </div>
   );
 }

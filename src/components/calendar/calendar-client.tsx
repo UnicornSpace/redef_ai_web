@@ -28,11 +28,11 @@ import { toggleTaskCompleted } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import {
   Empty,
   EmptyDescription,
@@ -386,13 +386,16 @@ function DayDetailDialog({
   }
 
   return (
-    <Dialog open={date !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+    <ResponsiveDialog
+      open={date !== null}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>
             {date ? format(parseISO(date), "EEEE, MMMM d") : ""}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <div className="flex flex-col gap-4 px-6 pb-6">
           {!summary ||
           (summary.tasks.length === 0 &&
@@ -441,7 +444,7 @@ function DayDetailDialog({
               {summary.habits.length > 0 ? (
                 <div className="flex mt-4 flex-col gap-1.5">
                   <h4 className="text-sm font-bold uppercase tracking-wide text-body-muted">
-                    Habits done
+                    Habits
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {summary.habits.map((h) => (
@@ -449,8 +452,13 @@ function DayDetailDialog({
                         key={h.id}
                         className="w-full max-w-20 flex flex-col items-center gap-1"
                       >
-                        <div className="bg-green-600 size-14 rounded-lg"></div>
-                        <p className="text-black text-xs text-center">
+                        <div
+                          className={cn(
+                            "size-14 rounded-lg",
+                            h.done ? "bg-rf-green-deep" : "bg-line",
+                          )}
+                        />
+                        <p className="text-ink text-xs text-center">
                           {h.name}
                         </p>
                       </div>
@@ -486,7 +494,7 @@ function DayDetailDialog({
             </>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
