@@ -9,9 +9,13 @@ import type {
 
 export async function listProjects(): Promise<Project[]> {
   const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return [];
+
   const { data, error } = await supabase
     .from("projects")
     .select("*")
+    .eq("user_id", user.user.id)
     .eq("is_deleted", false)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -57,9 +61,13 @@ export async function listSessions(
   limit = 50,
 ): Promise<DeepworkSessionWithProject[]> {
   const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return [];
+
   const { data, error } = await supabase
     .from("deepwork_sessions")
     .select("*, project:projects(id, name)")
+    .eq("user_id", user.user.id)
     .eq("is_deleted", false)
     .order("start_time", { ascending: false })
     .limit(limit);

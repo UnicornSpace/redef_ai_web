@@ -20,6 +20,8 @@ type FabConfig = {
 type FabContextValue = {
   fab: FabConfig | null;
   setFab: (fab: FabConfig | null) => void;
+  navHidden: boolean;
+  setNavHidden: (hidden: boolean) => void;
 };
 
 const MobileFabContext = createContext<FabContextValue | null>(null);
@@ -30,7 +32,11 @@ export function MobileFabProvider({
   children: ReactNode;
 }) {
   const [fab, setFab] = useState<FabConfig | null>(null);
-  const value = useMemo(() => ({ fab, setFab }), [fab]);
+  const [navHidden, setNavHidden] = useState(false);
+  const value = useMemo(
+    () => ({ fab, setFab, navHidden, setNavHidden }),
+    [fab, navHidden],
+  );
 
   return (
     <MobileFabContext.Provider value={value}>
@@ -46,6 +52,15 @@ export function useMobileFab(): FabConfig | null {
     throw new Error("useMobileFab must be used within MobileFabProvider");
   }
   return ctx.fab;
+}
+
+/** Read whether the bottom tab bar should be hidden — used by the mobile tab bar itself. */
+export function useMobileNavHidden(): boolean {
+  const ctx = useContext(MobileFabContext);
+  if (!ctx) {
+    throw new Error("useMobileNavHidden must be used within MobileFabProvider");
+  }
+  return ctx.navHidden;
 }
 
 /**
@@ -69,4 +84,24 @@ export function useRegisterFab(
     return () => setFab(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+}
+
+/**
+ * A page calls this to hide the mobile bottom tab bar while some
+ * full-screen, input-focused surface is active (e.g. an in-progress chat
+ * conversation) — mirrors most chat apps hiding their own tab bar once
+ * you're inside a conversation. Resets on unmount so the tab bar comes back
+ * for every other page.
+ */
+export function useSetNavHidden(hidden: boolean): void {
+  const ctx = useContext(MobileFabContext);
+  if (!ctx) {
+    throw new Error("useSetNavHidden must be used within MobileFabProvider");
+  }
+  const { setNavHidden } = ctx;
+
+  useEffect(() => {
+    setNavHidden(hidden);
+    return () => setNavHidden(false);
+  }, [hidden, setNavHidden]);
 }

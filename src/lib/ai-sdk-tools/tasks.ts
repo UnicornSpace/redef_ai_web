@@ -20,10 +20,17 @@ export const getTasksTool = tool({
     }),
     execute: async ({ isCompleted }) => {
         const supabase = await createClient()
+        const { data: user, error: authError } = await supabase.auth.getUser()
+        if (authError || !user?.user) {
+            return {
+                error: authError?.message ?? "Not signed in",
+            };
+        }
         const { data, error } = await supabase
             .from('tasks')
-            .select().eq("is_completed", isCompleted)
-        console.log(error)
+            .select()
+            .eq("user_id", user.user.id)
+            .eq("is_completed", isCompleted)
         if (error) {
             return {
                 error: error.message,

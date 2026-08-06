@@ -186,7 +186,8 @@ export default async function DashboardHomePage() {
     <div className="flex w-full flex-col">
       <PageHeader
         title={name ? `Hey ${name}` : "Hey"}
-        description="Just the things that move the needle today."
+        // description="Just the things that move the needle today."
+        className="py-0 my-4 "
       />
       <div className="flex flex-col gap-3 px-4 pb-10 md:px-8">
         <Suspense fallback={<GoalsSkeleton />}>

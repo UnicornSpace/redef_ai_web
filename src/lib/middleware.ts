@@ -51,7 +51,13 @@ export async function updateSession(request: NextRequest) {
   // project's Redirect URLs allowlist, Supabase silently falls back to the
   // Site URL and appends the code there instead of at /auth/callback.
   // Forward it to the real handler so sign-in still completes either way.
+  // Gated on `!user`: a stray/stale "?code=" sitting in the URL (browser
+  // history, a re-visited link) for someone who's ALREADY signed in must
+  // never trigger this — the code was already consumed on a prior request,
+  // so re-exchanging it just fails with an "invalid/expired" error for no
+  // reason.
   if (
+    !user &&
     pathname !== "/auth/callback" &&
     request.nextUrl.searchParams.has("code")
   ) {

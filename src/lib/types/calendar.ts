@@ -20,6 +20,7 @@ export interface DaySummary {
   financeNet: number;
   financeCount: number;
   workSeconds: number;
+  googleEvents: { id: string; title: string; allDay: boolean }[];
 }
 
 const PALETTE: CalendarEventColor[] = [

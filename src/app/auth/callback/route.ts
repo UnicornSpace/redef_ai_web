@@ -10,9 +10,46 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // Google OAuth re-auths that requested the calendar scope (see
+      // src/actions/google-calendar.ts:connectGoogleCalendar) come back
+      // with provider tokens on the session — capture them here since this
+      // is the only moment Supabase hands them to us. A plain sign-in
+      // won't have these, so this is a no-op for the normal login flow.
+      const providerToken = data.session?.provider_token
+      const providerRefreshToken = data.session?.provider_refresh_token
+      if (providerToken && data.user) {
+        const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
+        const update: {
+          user_id: string
+          access_token: string
+          expires_at: string
+          refresh_token?: string
+        } = {
+          user_id: data.user.id,
+          access_token: providerToken,
+          expires_at: expiresAt,
+        }
+        // Google only returns a refresh_token on the first consent — don't
+        // clobber a previously-stored one with null on a re-auth that
+        // didn't get a fresh one.
+        if (providerRefreshToken) update.refresh_token = providerRefreshToken
+        await supabase
+          .from('google_calendar_connections')
+          .upsert(update, { onConflict: 'user_id' })
+      }
+
+      return NextResponse.redirect(`${origin}${next}`)
+    }
+
+    // The exchange can fail simply because this code was already consumed
+    // by an earlier request for the same sign-in (e.g. a duplicate/raced
+    // request) — if we're actually already signed in, that's not a real
+    // failure, so don't send an already-authenticated user to an error page.
+    const { data: existing } = await supabase.auth.getUser()
+    if (existing.user) {
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

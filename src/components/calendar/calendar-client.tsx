@@ -15,24 +15,39 @@ import {
   subMonths,
 } from "date-fns";
 import {
+  CalendarPlus,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleAlertIcon,
   ListTodo,
+  MoreVertical,
   Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { connectGoogleCalendar } from "@/actions/google-calendar";
+import { toggleHabitDate } from "@/actions/habits";
 import { toggleTaskCompleted } from "@/actions/tasks";
-import { Button } from "@/components/ui/button";
+import { LucideCalendarFold } from "@/components/icons/lucide-calendar-fold";
+import { TdesignComponentSteps1 } from "@/components/icons/tdesign-component-steps-1";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogHeader,
+  ResponsiveDialogPanel,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyDescription,
@@ -228,7 +243,7 @@ function AgendaView({ events }: { events: CalendarEvent[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 px-2 py-4">
       {grouped.map(([date, items]) => {
         const day = parseISO(date);
         return (
@@ -252,13 +267,14 @@ function AgendaView({ events }: { events: CalendarEvent[] }) {
                   )}
                 >
                   <EventDot color={event.color} />
+                  <Checkbox checked={event.completed} />
                   <span
                     className={cn(
                       "flex-1",
                       event.completed && "text-body-muted line-through",
                     )}
                   >
-                    {event.title}
+                    {event.title} 
                   </span>
                 </Link>
               ))}
@@ -272,17 +288,33 @@ function AgendaView({ events }: { events: CalendarEvent[] }) {
 export function CalendarClient({
   events,
   daySummaries,
+  googleCalendarConnected,
 }: {
   events: CalendarEvent[];
   daySummaries: Record<string, DaySummary>;
+  googleCalendarConnected: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isConnecting, startConnectTransition] = useTransition();
+
+  function handleConnectGoogleCalendar() {
+    startConnectTransition(async () => {
+      const res = await connectGoogleCalendar();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      if (res.url) window.location.href = res.url;
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4 px-1 pb-16 md:px-8 mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Desktop / tablet header — full Month/Timeline tabs, spelled-out
+          month, and the nav + Today controls all visible at once. */}
+      <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
         <div className="flex flex-wrap items-center gap-2">
           <Tabs
             value={viewMode}
@@ -301,6 +333,17 @@ export function CalendarClient({
             <Plus />
             Add task
           </Button>
+          {/* {!googleCalendarConnected ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConnectGoogleCalendar}
+              disabled={isConnecting}
+            >
+              <CalendarPlus />
+              Connect Google Calendar
+            </Button>
+          ) : null} */}
         </div>
         {viewMode === "month" ? (
           <div className="flex items-center gap-2">
@@ -332,6 +375,70 @@ export function CalendarClient({
             </Button>
           </div>
         ) : null}
+      </div>
+
+      {/* Mobile header — month nav on the left, "Add task" + a "..." menu
+          (view switcher + Today) on the right, so it fits in one row. */}
+      <div className="flex items-center justify-between gap-2 md:hidden">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Previous month"
+            onClick={() => setMonthDate((d) => subMonths(d, 1))}
+          >
+            <ChevronLeft />
+          </Button>
+          <span className="min-w-[4.5rem] text-center text-sm font-semibold text-ink">
+            {format(monthDate, "MMM yyyy")}
+          </span>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Next month"
+            onClick={() => setMonthDate((d) => addMonths(d, 1))}
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            render={<Link href="/app/tasks" />}
+          >
+            <Plus />
+            Add task
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Calendar options"
+              className={cn(buttonVariants({ variant: "outline", size: "icon-sm" }))}
+            >
+              <MoreVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setViewMode("month")}>
+                <LucideCalendarFold />
+                Month
+                {viewMode === "month" ? (
+                  <Check className="ml-auto text-rf-green-deep" />
+                ) : null}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setViewMode("agenda")}>
+                <TdesignComponentSteps1 />
+                Timeline
+                {viewMode === "agenda" ? (
+                  <Check className="ml-auto text-rf-green-deep" />
+                ) : null}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setMonthDate(new Date())}>
+                Today
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {viewMode === "month" ? (
@@ -367,6 +474,9 @@ function DayDetailDialog({
   const [localCompleted, setLocalCompleted] = useState<Record<string, boolean>>(
     {},
   );
+  const [localHabitDone, setLocalHabitDone] = useState<Record<string, boolean>>(
+    {},
+  );
   const [, startTransition] = useTransition();
 
   function isTaskDone(taskId: string, serverCompleted: boolean): boolean {
@@ -385,6 +495,28 @@ function DayDetailDialog({
     });
   }
 
+  // Keyed by "habitId:date" — a habit's done-ness is per-day, and this
+  // dialog instance persists across different selected days without
+  // remounting, so a plain habitId key would leak state between days.
+  function isHabitDone(habitId: string, serverDone: boolean): boolean {
+    const key = `${habitId}:${date}`;
+    return localHabitDone[key] ?? serverDone;
+  }
+
+  function handleToggleHabit(habitId: string, currentDone: boolean) {
+    if (!date) return;
+    const key = `${habitId}:${date}`;
+    const next = !currentDone;
+    setLocalHabitDone((prev) => ({ ...prev, [key]: next }));
+    startTransition(async () => {
+      const res = await toggleHabitDate(habitId, date);
+      if (res.error) {
+        setLocalHabitDone((prev) => ({ ...prev, [key]: currentDone }));
+        toast.error(res.error);
+      }
+    });
+  }
+
   return (
     <ResponsiveDialog
       open={date !== null}
@@ -396,12 +528,13 @@ function DayDetailDialog({
             {date ? format(parseISO(date), "EEEE, MMMM d") : ""}
           </ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
-        <div className="flex flex-col gap-4 px-6 pb-6">
+        <ResponsiveDialogPanel className="flex flex-col gap-4">
           {!summary ||
           (summary.tasks.length === 0 &&
             summary.habits.length === 0 &&
             summary.financeCount === 0 &&
-            summary.workSeconds === 0) ? (
+            summary.workSeconds === 0 &&
+            summary.googleEvents.length === 0) ? (
             <p className="text-sm text-body-muted">
               Nothing recorded for this day.
             </p>
@@ -447,53 +580,94 @@ function DayDetailDialog({
                     Habits
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {summary.habits.map((h) => (
+                    {summary.habits.map((h) => {
+                      const done = isHabitDone(h.id, h.done);
+                      return (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => handleToggleHabit(h.id, done)}
+                          className="flex w-full max-w-20 flex-col items-center gap-1 active:scale-[0.96]"
+                          aria-label={`${done ? "Unmark" : "Mark"} ${h.name}`}
+                          aria-pressed={done}
+                        >
+                          <div
+                            className={cn(
+                              "size-14 rounded-lg transition-colors",
+                              done
+                                ? "bg-rf-green-deep hover:bg-rf-green-deep/80"
+                                : "bg-line hover:bg-body-muted/40",
+                            )}
+                          />
+                          <p className="text-ink text-xs text-center">
+                            {h.name}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {summary.workSeconds > 0 ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
+                    Deep work
+                  </span>
+                  <span className="tabular-nums text-sm font-semibold text-ink">
+                    {formatDuration(summary.workSeconds)}
+                  </span>
+                </div>
+              ) : null}
+              {summary.financeCount > 0 ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
+                      Personal finance
+                    </span>
+                    <span className="text-xs text-body-muted">
+                      {summary.financeCount} transaction
+                      {summary.financeCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <span
+                    className={cn(
+                      "tabular-nums text-sm font-semibold",
+                      summary.financeNet >= 0
+                        ? "text-rf-green-deep"
+                        : "text-rf-coral",
+                    )}
+                  >
+                    {summary.financeNet >= 0 ? "+" : "−"}
+                    {Math.abs(summary.financeNet)}
+                  </span>
+                </div>
+              ) : null}
+              {summary.googleEvents.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-body-muted">
+                    Google Calendar
+                  </h4>
+                  <div className="flex flex-col gap-1">
+                    {summary.googleEvents.map((ge) => (
                       <div
-                        key={h.id}
-                        className="w-full max-w-20 flex flex-col items-center gap-1"
+                        key={ge.id}
+                        className="flex items-center gap-2 rounded-lg border border-line px-3 py-2"
                       >
-                        <div
-                          className={cn(
-                            "size-14 rounded-lg",
-                            h.done ? "bg-rf-green-deep" : "bg-line",
-                          )}
+                        <span
+                          className="size-1.5 shrink-0 rounded-full"
+                          style={{ background: "var(--rf-sky)" }}
                         />
-                        <p className="text-ink text-xs text-center">
-                          {h.name}
-                        </p>
+                        <span className="truncate text-sm text-ink">
+                          {ge.title}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : null}
-              {summary.workSeconds > 0 ? (
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-body-muted">
-                    Deep work
-                  </h4>
-                  <p className="text-sm text-ink">
-                    {formatDuration(summary.workSeconds)} logged
-                  </p>
-                </div>
-              ) : null}
-              {summary.financeCount > 0 ? (
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-body-muted">
-                    Personal finance
-                  </h4>
-                  <p className="text-sm text-ink">
-                    {summary.financeCount} transaction
-                    {summary.financeCount === 1 ? "" : "s"} — net{" "}
-                    <span className="tabular-nums">
-                      {summary.financeNet >= 0 ? "+" : "-"}
-                      {Math.abs(summary.financeNet).toFixed(2)}
-                    </span>
-                  </p>
-                </div>
-              ) : null}
             </>
           )}
-        </div>
+        </ResponsiveDialogPanel>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );

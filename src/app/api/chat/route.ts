@@ -10,6 +10,7 @@ import {
   saveChatMessages,
   type UserPreferences,
 } from "@/actions/chat";
+import { logDeepWorkSessionTool } from "@/lib/ai-sdk-tools/deepwork";
 import { updateMemoryTool } from "@/lib/ai-sdk-tools/memory";
 import { pomodoroHoursTool } from "@/lib/ai-sdk-tools/pomodoro";
 import {
@@ -58,6 +59,15 @@ export async function POST(req: Request) {
         You can add new tasks and todos, get the tasks and todos, and mark tasks as completed.
         You can also get the secret pin of the user.
 
+        The current date/time is ${new Date().toString()}. Resolve any
+        relative time the user mentions ("today", "this morning", "from 9
+        to 5") against this before calling a tool that needs a timestamp.
+
+        When the user describes work they did in natural language — e.g. "I
+        worked from 9am to 5pm today" or "I focused for 3 hours this
+        morning" — call logDeepWorkSession with the resolved start/end
+        times to record it as a focus session.
+
         When you learn something durable about the user worth remembering for
         future conversations (their goals, ongoing projects, context, recurring
         preferences), call updateMemory with the complete updated summary.
@@ -69,6 +79,7 @@ export async function POST(req: Request) {
       addNewTask: addTasksTool,
       markTaskAsCompleted: markTaskAsCompletedTool,
       pomodoroHours: pomodoroHoursTool, // get the pomodoro hours of the user based on today
+      logDeepWorkSession: logDeepWorkSessionTool,
       updateMemory: updateMemoryTool,
     },
   });

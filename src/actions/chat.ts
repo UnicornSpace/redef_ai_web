@@ -2,6 +2,8 @@
 
 import type { UIMessage } from "ai";
 import { revalidatePath } from "next/cache";
+import { createAdminClient } from "@/lib/admin";
+import { referralCodeForUserId } from "@/lib/referral";
 import { createClient } from "@/lib/server";
 
 export interface ChatSummary {
@@ -171,7 +173,7 @@ export async function captureReferral(
   if (!trimmed) return {};
 
   // don't let a user refer themselves
-  const ownCode = user.user.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+  const ownCode = referralCodeForUserId(user.user.id);
   if (trimmed === ownCode) return {};
 
   const { data: existing } = await supabase
@@ -187,6 +189,66 @@ export async function captureReferral(
   });
   if (error) return { error: error.message };
   return {};
+}
+
+export interface ReferredUser {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  joinedAt: string | null;
+}
+
+/**
+ * Everyone whose referred_by matches the caller's own code — the "who did I
+ * bring in" list for the referral page. Crosses user boundaries by design
+ * (reading other people's user_preferences/profiles rows), so this uses the
+ * service-role admin client rather than relying on RLS, same pattern as
+ * getPublicProfile/getHabitCollaborators for other legitimate cross-user
+ * lookups.
+ */
+export async function getMyReferrals(): Promise<{
+  code: string;
+  referrals: ReferredUser[];
+}> {
+  const supabase = await createClient();
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) return { code: "", referrals: [] };
+
+  const code = referralCodeForUserId(user.user.id);
+  const admin = createAdminClient();
+
+  const { data: referredPrefs } = await admin
+    .from("user_preferences")
+    .select("user_id, nickname")
+    .eq("referred_by", code);
+
+  const userIds = (referredPrefs ?? [])
+    .map((r) => r.user_id as string | null)
+    .filter((id): id is string => Boolean(id));
+  if (userIds.length === 0) return { code, referrals: [] };
+
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("user_id, username, created_at")
+    .in("user_id", userIds);
+  const profileByUser = new Map(
+    (profiles ?? []).map((p) => [p.user_id as string, p]),
+  );
+
+  const referrals: ReferredUser[] = (referredPrefs ?? [])
+    .filter((r) => r.user_id)
+    .map((r) => {
+      const profile = profileByUser.get(r.user_id as string);
+      return {
+        userId: r.user_id as string,
+        username: profile?.username ?? null,
+        displayName:
+          (r.nickname as string | null) || profile?.username || "A new member",
+        joinedAt: (profile?.created_at as string | undefined) ?? null,
+      };
+    });
+
+  return { code, referrals };
 }
 
 export async function updateUserPreferences(input: {

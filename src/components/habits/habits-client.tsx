@@ -26,6 +26,7 @@ import {
   ResponsiveDialogContent,
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
+  ResponsiveDialogPanel,
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
 } from "@/components/ui/responsive-dialog";
@@ -609,7 +610,7 @@ export function HabitsClient({
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>Add a habit</ResponsiveDialogTitle>
             </ResponsiveDialogHeader>
-            <div className="flex flex-col gap-4 px-6">
+            <ResponsiveDialogPanel className="flex flex-col gap-4">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -649,7 +650,7 @@ export function HabitsClient({
                   />
                 </div>
               </div>
-            </div>
+            </ResponsiveDialogPanel>
             <ResponsiveDialogFooter>
               <Button onClick={handleCreate} disabled={!name.trim()}>
                 Add habit

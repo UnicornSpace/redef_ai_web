@@ -138,15 +138,19 @@ export async function listActiveGoals(): Promise<GoalWithProgress[]> {
     const habits = habitsByGoal.get(goal.id) ?? [];
     const tasks = tasksByGoal.get(goal.id) ?? [];
     const elapsedEnd = goal.end_date < today ? goal.end_date : today;
+    const elapsedDays = dateRange(goal.start_date, elapsedEnd);
     const hoursLogged =
       goal.daily_hours_target != null
         ? hoursInRange(goal.start_date, elapsedEnd)
+        : null;
+    const hoursTarget =
+      goal.daily_hours_target != null
+        ? goal.daily_hours_target * daysBetween(goal.start_date, elapsedEnd)
         : null;
 
     const componentsPct: number[] = [];
 
     if (habits.length > 0) {
-      const elapsedDays = dateRange(goal.start_date, elapsedEnd);
       let done = 0;
       for (const h of habits) {
         const set = new Set(h.completed_dates ?? []);
@@ -162,11 +166,9 @@ export async function listActiveGoals(): Promise<GoalWithProgress[]> {
     }
 
     if (goal.daily_hours_target != null && goal.daily_hours_target > 0) {
-      const days = daysBetween(goal.start_date, elapsedEnd);
-      const targetTotal = goal.daily_hours_target * days;
-      if (targetTotal > 0) {
+      if (hoursTarget && hoursTarget > 0) {
         componentsPct.push(
-          Math.min(100, ((hoursLogged ?? 0) / targetTotal) * 100),
+          Math.min(100, ((hoursLogged ?? 0) / hoursTarget) * 100),
         );
       }
     }
@@ -180,9 +182,20 @@ export async function listActiveGoals(): Promise<GoalWithProgress[]> {
 
     return {
       ...goal,
-      habits: habits.map((h) => ({ id: h.id, name: h.name })),
+      habits: habits.map((h) => {
+        const set = new Set(h.completed_dates ?? []);
+        const daysDone = elapsedDays.filter((d) => set.has(d)).length;
+        return {
+          id: h.id,
+          name: h.name,
+          completedToday: set.has(today),
+          daysDone,
+          daysElapsed: elapsedDays.length,
+        };
+      }),
       tasks,
       hoursLogged,
+      hoursTarget,
       progressPct,
     };
   });

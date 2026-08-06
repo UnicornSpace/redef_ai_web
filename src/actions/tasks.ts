@@ -6,9 +6,13 @@ import type { Task } from "@/lib/types/productivity";
 
 export async function listTasks(): Promise<Task[]> {
   const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return [];
+
   const { data, error } = await supabase
     .from("tasks")
     .select("*")
+    .eq("user_id", user.user.id)
     .eq("is_deleted", false)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);

@@ -11,14 +11,16 @@ import { cn } from "@/lib/utils";
 export function PageHeader({
   title,
   description,
+  className,
   actions,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 px-4 pt-8 pb-2 md:px-8">
+    <div className={cn("flex flex-col gap-3 px-4 pt-8 pb-2 md:px-8", className)}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-balance text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
           {title}

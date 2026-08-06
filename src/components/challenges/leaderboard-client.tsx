@@ -9,6 +9,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { AVATAR_ACCENT_BG_CLASSES, accentIndexFor, initialsOf } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
 export function LeaderboardClient({
@@ -55,6 +56,14 @@ export function LeaderboardClient({
               )}
             >
               {i === 0 ? <Trophy size={12} /> : i + 1}
+            </span>
+            <span
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white",
+                AVATAR_ACCENT_BG_CLASSES[accentIndexFor(entry.displayName)],
+              )}
+            >
+              {initialsOf(entry.displayName)}
             </span>
             <span className="flex-1 truncate text-sm font-medium text-ink">
               {entry.displayName}

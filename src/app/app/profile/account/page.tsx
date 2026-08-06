@@ -1,6 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
-import { getUserPreferences } from "@/actions/chat";
+import { getMyReferrals, getUserPreferences } from "@/actions/chat";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { LogoutButton } from "@/components/logout-button";
 import { DisplayNameForm } from "@/components/profile/display-name-form";
@@ -25,9 +25,10 @@ function summarizePreferences(
 
 const AccountPage = async () => {
   const supabase = await createClient();
-  const [{ data }, preferences] = await Promise.all([
+  const [{ data }, preferences, { referrals }] = await Promise.all([
     supabase.auth.getUser(),
     getUserPreferences(),
+    getMyReferrals(),
   ]);
   const email = data.user?.email;
   const fullName = data.user?.user_metadata?.full_name as string | undefined;
@@ -131,7 +132,9 @@ const AccountPage = async () => {
                 Invite friends
               </span>
               <span className="text-xs text-body-muted">
-                Share your referral link
+                {referrals.length > 0
+                  ? `${referrals.length} ${referrals.length === 1 ? "person" : "people"} invited`
+                  : "Share your referral link"}
               </span>
             </div>
             <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />

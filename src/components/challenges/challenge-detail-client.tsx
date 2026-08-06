@@ -10,6 +10,7 @@ import {
   toggleChallengeDate,
 } from "@/actions/challenges";
 import { Button } from "@/components/ui/button";
+import { AVATAR_ACCENT_BG_CLASSES, accentIndexFor, initialsOf } from "@/lib/avatar";
 import type { Challenge, ChallengeParticipant } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
 
@@ -156,6 +157,16 @@ export function ChallengeDetailClient({
                 )}
               >
                 {i === 0 ? <Trophy size={12} /> : i + 1}
+              </span>
+              <span
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white",
+                  AVATAR_ACCENT_BG_CLASSES[
+                    accentIndexFor(p.display_name ?? "Someone")
+                  ],
+                )}
+              >
+                {initialsOf(p.display_name ?? "Someone")}
               </span>
               <span className="flex-1 text-sm font-medium text-ink">
                 {p.display_name ?? "Someone"}
