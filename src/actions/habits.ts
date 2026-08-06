@@ -59,17 +59,53 @@ export async function listHabits(): Promise<HabitListItem[]> {
   }));
 
   type CollabRow = HabitCollaborator & { habit: Habit | null };
-  const collaborationItems: HabitListItem[] = (
+  const myCollaborations = (
     (myCollaborationsRes.data ?? []) as CollabRow[]
-  )
-    .filter((c) => c.habit)
-    .map((c) => ({
-      ...(c.habit as Habit),
+  ).filter((c) => c.habit);
+  const collaborationHabitIds = myCollaborations.map((c) => c.habit_id);
+
+  // Comparison view needs the OTHER participants too — not just the caller's
+  // own row. For a habit the caller joined (rather than owns), that's the
+  // owner (from the joined habits row) plus any sibling collaborators, so
+  // fetch those siblings the same way collaboratorsByHabit does for owned
+  // habits above.
+  const { data: siblingCollaborators } =
+    collaborationHabitIds.length > 0
+      ? await supabase
+          .from("habit_collaborators")
+          .select("*")
+          .in("habit_id", collaborationHabitIds)
+          .eq("is_deleted", false)
+          .neq("user_id", userId)
+      : { data: [] as HabitCollaborator[] };
+  const siblingsByHabit = new Map<string, HabitCollaborator[]>();
+  for (const c of siblingCollaborators ?? []) {
+    const list = siblingsByHabit.get(c.habit_id) ?? [];
+    list.push(c);
+    siblingsByHabit.set(c.habit_id, list);
+  }
+
+  const collaborationItems: HabitListItem[] = myCollaborations.map((c) => {
+    const habit = c.habit as Habit;
+    const owner: HabitCollaborator = {
+      id: `owner:${habit.id}`,
+      habit_id: habit.id,
+      user_id: habit.user_id,
+      display_name: habit.owner_display_name,
+      completed_dates: habit.completed_dates ?? [],
+      joined_at: habit.created_at,
+      is_deleted: false,
+      created_at: habit.created_at,
+      updated_at: habit.updated_at,
+    };
+    return {
+      ...habit,
       completed_dates: c.completed_dates ?? [],
       isCollaboration: true,
       collaboratorId: c.id,
-      collaborators: [],
-    }));
+      collaborators: [owner, ...(siblingsByHabit.get(habit.id) ?? [])],
+    };
+  });
 
   return [...ownedItems, ...collaborationItems].sort((a, b) =>
     a.created_at < b.created_at ? -1 : 1,

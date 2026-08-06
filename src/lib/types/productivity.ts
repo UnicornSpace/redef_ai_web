@@ -109,9 +109,16 @@ export interface Goal {
 }
 
 export interface GoalWithProgress extends Goal {
-  habits: { id: string; name: string }[];
+  habits: {
+    id: string;
+    name: string;
+    completedToday: boolean;
+    daysDone: number;
+    daysElapsed: number;
+  }[];
   tasks: { id: string; name: string; is_completed: boolean }[];
   hoursLogged: number | null;
+  hoursTarget: number | null;
   progressPct: number;
 }
 

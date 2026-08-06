@@ -1,11 +1,13 @@
-import { ForgotPasswordForm } from '@/components/forgot-password-form'
+import { AuthShell } from "@/components/auth/auth-shell";
+import { ForgotPasswordForm } from "@/components/forgot-password-form";
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <ForgotPasswordForm />
-      </div>
-    </div>
-  )
+    <AuthShell
+      title="Reset your password"
+      subtitle="We'll email you a link to get back in."
+    >
+      <ForgotPasswordForm />
+    </AuthShell>
+  );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
+import { CuelumeBind } from "@/components/cuelume-bind";
 import { ReferralCapture } from "@/components/referral-capture";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased  bg-[#F7F5F3]`}
       >
         <ReferralCapture />
+        <CuelumeBind />
         {children}
         <Toaster />
       </body>

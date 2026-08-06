@@ -2,7 +2,8 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type ToolUIPart, type UIMessage } from "ai";
-import { useState } from "react";
+import { Loader2Icon, MicIcon, SquareIcon } from "lucide-react";
+import { useRef, useState } from "react";
 import {
   FaBullseye,
   FaCalendar,
@@ -11,6 +12,7 @@ import {
   FaTasks,
 } from "react-icons/fa";
 import { FaArrowUp } from "react-icons/fa6";
+import { useSetNavHidden } from "@/components/app-shell/mobile-fab-context";
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { Response } from "@/components/ai-elements/response";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
@@ -36,12 +38,18 @@ export function ChatPane({
   chatId,
   initialMessages,
   greeting,
+  autoSendVoice,
 }: {
   chatId: string;
   initialMessages: UIMessage[];
   greeting: string;
+  autoSendVoice: boolean;
 }) {
   const [input, setInput] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const { messages, sendMessage } = useChat({
     id: chatId,
     messages: initialMessages,
@@ -51,6 +59,57 @@ export function ChatPane({
     }),
   });
 
+  useSetNavHidden(messages.length > 0);
+
+  async function handleMicClick() {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        for (const track of stream.getTracks()) track.stop();
+        setIsRecording(false);
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        if (blob.size === 0) return;
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("audio", blob, "recording.webm");
+          const res = await fetch("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+          const data: { text?: string; error?: string } = await res.json();
+          const text = data.text?.trim();
+          if (text) {
+            if (autoSendVoice) {
+              sendMessage({ text });
+            } else {
+              setInput((prev) => (prev ? `${prev} ${text}` : text));
+            }
+          }
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      // mic permission denied or unavailable — silently no-op, the text
+      // input is always still there as a fallback
+    }
+  }
+
   return (
     <div className="flex w-full flex-col px-4 pt-8 pb-28 md:pt-16">
       {messages.length === 0 ? (
@@ -59,8 +118,8 @@ export function ChatPane({
         </p>
       ) : null}
 
-      {messages.map((message) => (
-        <div key={message.id} className="whitespace-pre-wrap">
+      {messages.map((message, i) => (
+        <div key={i} className="whitespace-pre-wrap">
           {message.parts.map((part, i) => {
             if (part.type === "text") {
               return (
@@ -115,21 +174,46 @@ export function ChatPane({
             sendMessage({ text: input });
             setInput("");
           }}
-          className="relative mx-auto mb-4 flex w-full max-w-2xl min-w-0 items-center justify-between rounded-full border border-line bg-white px-3 py-1 shadow-xl"
+          className="relative mx-auto mb-4 flex w-full max-w-2xl min-w-0 items-center justify-between rounded-full border border-line bg-white px-4 py-2 shadow-xl md:px-3 md:py-1"
         >
           <input
-            className="w-full text-base outline-none"
+            className="w-full text-lg outline-none md:text-base"
             value={input}
-            placeholder="Say something..."
+            placeholder={
+              isRecording
+                ? "Listening..."
+                : isTranscribing
+                  ? "Transcribing..."
+                  : "Say something..."
+            }
+            disabled={isRecording || isTranscribing}
             onChange={(e) => setInput(e.target.value)}
           />
+          <Button
+            type="button"
+            variant={isRecording ? "destructive" : "ghost"}
+            size="icon"
+            className="size-11 shrink-0 md:size-9"
+            disabled={isTranscribing}
+            onClick={handleMicClick}
+            aria-label={isRecording ? "Stop recording" : "Record a voice note"}
+          >
+            {isTranscribing ? (
+              <Loader2Icon size={18} className="animate-spin md:size-4" />
+            ) : isRecording ? (
+              <SquareIcon size={18} className="md:size-4" />
+            ) : (
+              <MicIcon size={18} className="md:size-4" />
+            )}
+          </Button>
           <Button
             type="submit"
             variant={input.trim().length > 0 ? "default" : "ghost"}
             size="icon"
-            disabled={!input.trim()}
+            className="size-11 shrink-0 md:size-9"
+            disabled={!input.trim() || isRecording || isTranscribing}
           >
-            <FaArrowUp size={16} />
+            <FaArrowUp size={18} className="md:size-4" />
           </Button>
         </form>
         {messages.length === 0 ? (

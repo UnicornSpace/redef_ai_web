@@ -25,8 +25,16 @@ import {
   ResponsiveDialogContent,
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
+  ResponsiveDialogPanel,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Task } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
@@ -38,6 +46,7 @@ function uid(): string {
 }
 
 type Filter = "active" | "all" | "completed";
+const ALL_CATEGORIES = "__all__";
 
 export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -45,6 +54,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [category, setCategory] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("active");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [addOpen, setAddOpen] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -58,10 +68,14 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   }, [tasks]);
 
   const filtered = useMemo(() => {
-    if (filter === "active") return tasks.filter((t) => !t.is_completed);
-    if (filter === "completed") return tasks.filter((t) => t.is_completed);
-    return tasks;
-  }, [tasks, filter]);
+    let list = tasks;
+    if (filter === "active") list = list.filter((t) => !t.is_completed);
+    else if (filter === "completed") list = list.filter((t) => t.is_completed);
+    if (categoryFilter !== ALL_CATEGORIES) {
+      list = list.filter((t) => (t.category?.trim() || "General") === categoryFilter);
+    }
+    return list;
+  }, [tasks, filter, categoryFilter]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, Task[]>();
@@ -215,7 +229,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>Add a task</ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
-          <div className="flex flex-col gap-4 px-6">
+          <ResponsiveDialogPanel className="flex flex-col gap-4">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -233,7 +247,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
-          </div>
+          </ResponsiveDialogPanel>
           <ResponsiveDialogFooter>
             <Button onClick={handleAdd} disabled={!name.trim()}>
               Add task
@@ -253,9 +267,27 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             <TabsTab value="completed">Completed</TabsTab>
           </TabsList>
         </Tabs>
-        <span className="text-sm text-body-muted">
-          {activeCount} left
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-body-muted">{activeCount} left</span>
+          {categories.length > 0 ? (
+            <Select
+              onValueChange={(v) => setCategoryFilter(v ?? ALL_CATEGORIES)}
+              value={categoryFilter}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES}>All categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
       </div>
 
       {grouped.length === 0 ? (
@@ -278,9 +310,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
         <div className="flex flex-col gap-6">
           {grouped.map(([categoryLabel, items]) => (
             <div key={categoryLabel} className="flex flex-col gap-1">
-              <h2 className="px-2 text-xs font-bold uppercase tracking-wide text-body-muted">
-                {categoryLabel}
-              </h2>
+              {categoryFilter === ALL_CATEGORIES ? (
+                <h2 className="px-2 text-xs font-bold uppercase tracking-wide text-body-muted">
+                  {categoryLabel}
+                </h2>
+              ) : null}
               <div className="rounded-2xl border border-line bg-paper">
                 {items.map((task, i) => (
                   <div
@@ -333,7 +367,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             </ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
           {detailTask ? (
-            <div className="flex flex-col gap-4 px-6">
+            <ResponsiveDialogPanel className="flex flex-col gap-4">
               {detailTask.category ? (
                 <span className="w-fit rounded-full bg-g-green-pale px-2.5 py-0.5 text-xs font-semibold text-rf-green-deep">
                   {detailTask.category}
@@ -360,7 +394,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                   ? "Marked complete ✓"
                   : "Mark complete"}
               </Button>
-            </div>
+            </ResponsiveDialogPanel>
           ) : null}
           <ResponsiveDialogFooter>
             <Button

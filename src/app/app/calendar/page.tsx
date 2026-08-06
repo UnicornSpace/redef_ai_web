@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { listSessions } from "@/actions/deepwork";
 import { listTransactions } from "@/actions/finance";
+import {
+  isGoogleCalendarConnected,
+  listGoogleCalendarEvents,
+} from "@/actions/google-calendar";
 import { listHabits } from "@/actions/habits";
 import { listTasks } from "@/actions/tasks";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -42,12 +46,27 @@ function CalendarSkeleton() {
 }
 
 async function CalendarData() {
-  const [tasks, habits, sessions, transactions] = await Promise.all([
-    listTasks(),
-    listHabits(),
-    listSessions(500),
-    listTransactions(),
-  ]);
+  const now = new Date();
+  const rangeStart = new Date(now);
+  rangeStart.setDate(rangeStart.getDate() - 35);
+  const rangeEnd = new Date(now);
+  rangeEnd.setDate(rangeEnd.getDate() + 60);
+
+  const [tasks, habits, sessions, transactions, googleConnected] =
+    await Promise.all([
+      listTasks(),
+      listHabits(),
+      listSessions(500),
+      listTransactions(),
+      isGoogleCalendarConnected(),
+    ]);
+
+  const googleEvents = googleConnected
+    ? await listGoogleCalendarEvents(
+        rangeStart.toISOString(),
+        rangeEnd.toISOString(),
+      )
+    : [];
 
   const events: CalendarEvent[] = tasks
     .filter((t) => t.due_date)
@@ -70,6 +89,7 @@ async function CalendarData() {
       financeNet: 0,
       financeCount: 0,
       workSeconds: 0,
+      googleEvents: [],
     };
     daySummaries[date] = created;
     return created;
@@ -106,8 +126,29 @@ async function CalendarData() {
     const key = dateKey(new Date(s.start_time));
     bucket(key).workSeconds += s.duration_in_seconds;
   }
+  for (const ge of googleEvents) {
+    if (!ge.start) continue;
+    const key = ge.allDay ? ge.start : dateKey(new Date(ge.start));
+    bucket(key).googleEvents.push({
+      id: ge.id,
+      title: ge.title,
+      allDay: ge.allDay,
+    });
+    events.push({
+      id: `google-${ge.id}`,
+      title: ge.title,
+      date: key,
+      color: "blue",
+    });
+  }
 
-  return <CalendarClient events={events} daySummaries={daySummaries} />;
+  return (
+    <CalendarClient
+      daySummaries={daySummaries}
+      events={events}
+      googleCalendarConnected={googleConnected}
+    />
+  );
 }
 
 export default function CalendarPage() {
@@ -115,6 +156,7 @@ export default function CalendarPage() {
     <div className="flex w-full flex-col">
       <PageHeader
         title="Calendar"
+        className="mt-4  py-0"
         // description="See what's due, day by day — click any day for a summary, or switch to Timeline for a scrolling list."
       />
       <Suspense fallback={<CalendarSkeleton />}>

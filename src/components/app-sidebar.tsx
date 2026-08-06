@@ -21,24 +21,45 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import type { ModuleKey } from "@/lib/modules";
 
 const NAV_ITEMS = [
-  { href: "/app/talk", label: "Talk", icon: BsStars, size: "size-7!" },
-  { href: "/app/habits", label: "Habits", icon: PiPlantBold, size: "size-7!" },
+  { href: "/app/talk", label: "Talk", icon: BsStars, size: "size-7!", moduleKey: null },
+  {
+    href: "/app/habits",
+    label: "Habits",
+    icon: PiPlantBold,
+    size: "size-7!",
+    moduleKey: "habits" as ModuleKey,
+  },
   {
     href: "/app/personal-finance",
     label: "Personal Finance",
     icon: FaMoneyBill,
     size: "size-7!",
+    moduleKey: "personal_finance" as ModuleKey,
   },
-  { href: "/app/tasks", label: "Tasks", icon: FaTasks, size: "size-6!" },
-  { href: "/app/deep-work", label: "Deep Work", icon: Timer, size: "size-6!" },
-  { href: "/app/calendar", label: "Calendar", icon: Calendar, size: "size-7!" },
+  {
+    href: "/app/tasks",
+    label: "Tasks",
+    icon: FaTasks,
+    size: "size-6!",
+    moduleKey: "tasks" as ModuleKey,
+  },
+  {
+    href: "/app/deep-work",
+    label: "Deep Work",
+    icon: Timer,
+    size: "size-6!",
+    moduleKey: "deep_work" as ModuleKey,
+  },
+  { href: "/app/calendar", label: "Calendar", icon: Calendar, size: "size-7!", moduleKey: null },
   {
     href: "/app/challenges",
     label: "Challenges",
     icon: Trophy,
     size: "size-6!",
+    moduleKey: null,
   },
 ];
 
@@ -46,8 +67,16 @@ function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  enabledModules,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  enabledModules: ModuleKey[];
+}) {
   const pathname = usePathname();
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => item.moduleKey === null || enabledModules.includes(item.moduleKey),
+  );
 
   return (
     <Sidebar
@@ -75,7 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="bg-sidebar pt-8 ">
         <SidebarGroup className="flex justify-center">
           <SidebarMenu className="gap-3 ml-2 group-data-[collapsible=icon]:ml-0">
-            {NAV_ITEMS.map((item) => {
+            {visibleItems.map((item) => {
               const active = isActivePath(pathname, item.href);
               return (
                 <SidebarMenuItem key={item.href}>
