@@ -26,7 +26,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { useAutoSendVoice } from "@/hooks/use-talk-settings";
+import { useAutoSendVoice, useLiveMode } from "@/hooks/use-talk-settings";
 import { cn } from "@/lib/utils";
 
 export function TalkClient({
@@ -43,6 +43,7 @@ export function TalkClient({
   const [, startTransition] = useTransition();
   const didAutoResume = useRef(false);
   const [autoSendVoice, setAutoSendVoice] = useAutoSendVoice();
+  const [liveMode, setLiveMode] = useLiveMode();
 
   useEffect(() => {
     if (chatId) return;
@@ -106,7 +107,7 @@ export function TalkClient({
   const visibleChats = chats.filter((c) => c.title);
 
   return (
-    <div className="relative flex w-full flex-1 flex-col">
+    <div className="relative flex max-w-4xl mx-auto flex-1 flex-col">
       <div className="absolute top-4 right-4 z-10 flex gap-2 md:top-6 md:right-8">
         <Popover>
           <PopoverTrigger
@@ -121,20 +122,33 @@ export function TalkClient({
             <Settings2 />
           </PopoverTrigger>
           <PopoverPopup align="end" className="w-72">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-semibold text-ink">
-                  Auto-send voice notes
-                </span>
-                <span className="text-xs text-body-muted">
-                  Off: transcription fills the input so you can review it
-                  first. On: it sends the moment it's transcribed.
-                </span>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-ink">
+                    Auto-send voice notes
+                  </span>
+                </div>
+                <Switch
+                  checked={autoSendVoice}
+                  onCheckedChange={setAutoSendVoice}
+                />
               </div>
-              <Switch
-                checked={autoSendVoice}
-                onCheckedChange={setAutoSendVoice}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-ink">
+                    Live transcription
+                  </span>
+                  <span className="text-xs text-body-muted">
+                    On-device, streams words as you speak. Off uses Whisper
+                    (more accurate, all-at-once).
+                  </span>
+                </div>
+                <Switch
+                  checked={liveMode}
+                  onCheckedChange={setLiveMode}
+                />
+              </div>
             </div>
           </PopoverPopup>
         </Popover>
@@ -201,6 +215,7 @@ export function TalkClient({
           initialMessages={initialMessages}
           greeting={greeting}
           autoSendVoice={autoSendVoice}
+          liveMode={liveMode}
         />
       ) : null}
     </div>

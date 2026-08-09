@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 const AUTO_SEND_VOICE_KEY = "redef.talk.autoSendVoice";
+const LIVE_MODE_KEY = "redef.talk.liveMode";
 
 /**
  * Whether a voice note should send itself the moment it's transcribed, vs.
@@ -25,4 +26,26 @@ export function useAutoSendVoice(): [boolean, (value: boolean) => void] {
   }
 
   return [autoSend, setAutoSend];
+}
+
+/**
+ * Voice-input model preference — `true` uses the browser's on-device
+ * SpeechRecognition (Chrome/Edge; streams words into the input as you
+ * speak); `false` uses the existing Whisper batch flow (better accuracy,
+ * captured all-at-once at stop). Persisted per device like autoSendVoice.
+ */
+export function useLiveMode(): [boolean, (value: boolean) => void] {
+  const [live, setLiveState] = useState(false);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(LIVE_MODE_KEY);
+    if (stored != null) setLiveState(stored === "true");
+  }, []);
+
+  function setLive(value: boolean): void {
+    setLiveState(value);
+    window.localStorage.setItem(LIVE_MODE_KEY, String(value));
+  }
+
+  return [live, setLive];
 }

@@ -7,18 +7,32 @@ import {
 } from "ai";
 import {
   getUserPreferences,
+  recordChatUsage,
   saveChatMessages,
   type UserPreferences,
 } from "@/actions/chat";
-import { logDeepWorkSessionTool } from "@/lib/ai-sdk-tools/deepwork";
+import {
+  getDeepWorkSummaryTool,
+  listDeepWorkProjectsTool,
+  logDeepWorkSessionsTool,
+} from "@/lib/ai-sdk-tools/deepwork";
+import {
+  addTransactionTool,
+  getFinanceSummaryTool,
+  listRecentTransactionsTool,
+} from "@/lib/ai-sdk-tools/finance";
+import {
+  listHabitsTool,
+  toggleHabitTodayTool,
+} from "@/lib/ai-sdk-tools/habits";
 import { updateMemoryTool } from "@/lib/ai-sdk-tools/memory";
-import { pomodoroHoursTool } from "@/lib/ai-sdk-tools/pomodoro";
 import {
   addTasksTool,
   getSecretPinTool,
   getTasksTool,
   markTaskAsCompletedTool,
 } from "@/lib/ai-sdk-tools/tasks";
+import { createClient } from "@/lib/server";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -47,12 +61,28 @@ export async function POST(req: Request) {
   const { messages, chatId }: { messages: UIMessage[]; chatId?: string } =
     await req.json();
 
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const userId = authData?.user?.id;
+
   const preferences = await getUserPreferences();
 
   const result = streamText({
     model: openai("gpt-4o"),
-    messages: convertToModelMessages(messages),
-    stopWhen: stepCountIs(5),
+    // convertToModelMessages became async in ai@7 — used to return
+    // ModelMessage[] directly, now returns Promise<ModelMessage[]>.
+    messages: await convertToModelMessages(messages),
+    // Bumped from 5 → 8 so a full deep-work flow (list projects → log a
+    // batch of sessions → summarize back to the user) fits in one turn.
+    stopWhen: stepCountIs(8),
+    onFinish: async ({ totalUsage }) => {
+      if (chatId && userId) {
+        await recordChatUsage(chatId, userId, {
+          inputTokens: totalUsage.inputTokens ?? 0,
+          outputTokens: totalUsage.outputTokens ?? 0,
+        });
+      }
+    },
     system: `hey you're a productivity assistant, you help user to get their work done.
 
         You are a productivity assistant that can help the user with their tasks and todos.
@@ -63,10 +93,60 @@ export async function POST(req: Request) {
         relative time the user mentions ("today", "this morning", "from 9
         to 5") against this before calling a tool that needs a timestamp.
 
-        When the user describes work they did in natural language — e.g. "I
-        worked from 9am to 5pm today" or "I focused for 3 hours this
-        morning" — call logDeepWorkSession with the resolved start/end
-        times to record it as a focus session.
+        DEEP-WORK LOGGING (important):
+
+        When the user describes work they did in natural language — e.g.
+        "I worked from 9am to 5pm today", "I focused for 3 hours this
+        morning", "I worked 9-12 on the redesign and 1-5 on the API" —
+        follow this flow:
+
+        1. FIRST call listDeepWorkProjects to see what projects exist. Do
+           this even for a single-stretch log, so you can match by project.
+        2. Then call logDeepWorkSessions with ONE array entry per
+           continuous stretch. If the user described two different periods
+           (with a gap, or on different projects) pass them as two entries,
+           not one merged block. Attach a projectId only when the name
+           truly matches something from step 1; leave it null otherwise.
+        3. If the user mentioned working on something that isn't in the
+           project list, tell them the project isn't set up yet and log the
+           session unlinked — do not invent a projectId.
+        4. After logging, briefly confirm what got recorded (hours, which
+           projects) in one sentence.
+
+        SUMMARIZING DEEP-WORK TIME:
+
+        When the user asks how much they worked ("how much did I work
+        today / yesterday / this week / this month" or a custom range),
+        call getDeepWorkSummary with the matching range. Answer with the
+        total hours plus a short per-project breakdown when there's more
+        than one project.
+
+        HABITS:
+
+        When the user asks about habits ("how are my habits", "did I
+        do X today"), call listHabits — the UI renders habits as chips,
+        so answer briefly ("5 habits, 3 done today") without re-listing
+        each one. Use toggleHabitToday to mark/unmark a habit for today
+        by id.
+
+        PERSONAL FINANCE:
+
+        When the user asks about spending or income ("how much did I
+        spend this month", "what did I spend on"), call
+        getFinanceSummary — the UI renders it as metric cards + a
+        top-categories list. When the user asks for their recent
+        transactions, call listRecentTransactions. When they clearly
+        say they want to log a specific amount ("I spent $12 on
+        coffee"), call addTransaction. Always confirm briefly after
+        adding.
+
+        UI RENDERING NOTE (important):
+
+        For all tools that return structured lists (getTasks, listHabits,
+        listRecentTransactions, getFinanceSummary), the chat UI renders
+        the data in a purpose-built widget below your text. DO NOT
+        re-enumerate every row in prose — a one-sentence summary is
+        enough. This keeps the conversation clean.
 
         When you learn something durable about the user worth remembering for
         future conversations (their goals, ongoing projects, context, recurring
@@ -78,14 +158,24 @@ export async function POST(req: Request) {
       getSecretPin: getSecretPinTool,
       addNewTask: addTasksTool,
       markTaskAsCompleted: markTaskAsCompletedTool,
-      pomodoroHours: pomodoroHoursTool, // get the pomodoro hours of the user based on today
-      logDeepWorkSession: logDeepWorkSessionTool,
+      listDeepWorkProjects: listDeepWorkProjectsTool,
+      logDeepWorkSessions: logDeepWorkSessionsTool,
+      getDeepWorkSummary: getDeepWorkSummaryTool,
+      listHabits: listHabitsTool,
+      toggleHabitToday: toggleHabitTodayTool,
+      getFinanceSummary: getFinanceSummaryTool,
+      listRecentTransactions: listRecentTransactionsTool,
+      addTransaction: addTransactionTool,
       updateMemory: updateMemoryTool,
     },
   });
 
   return result.toUIMessageStreamResponse({
     originalMessages: messages,
+    // gpt-4o never emits reasoning parts, so this is a no-op today — but
+    // the chat UI already renders a Reasoning block if one shows up, so
+    // switching to a reasoning-capable model later needs no other change.
+    sendReasoning: true,
     onFinish: async ({ messages: finalMessages }) => {
       if (chatId) {
         await saveChatMessages(chatId, finalMessages);

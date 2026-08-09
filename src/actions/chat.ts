@@ -108,6 +108,34 @@ export async function saveChatMessages(
   return {};
 }
 
+/**
+ * Logs one AI Talk turn's token usage — called from the streamText onFinish
+ * in src/app/api/chat/route.ts, which already has the authenticated user's
+ * id from the request, so this trusts it rather than re-deriving it from
+ * cookies. Uses the service-role admin client: this app's tables generally
+ * don't rely on RLS for correctness (see other actions files), but
+ * chat_usage is a brand-new table and whatever default RLS policy applies
+ * to it blocks a plain authenticated insert, so bypass it the same way
+ * every other cross-boundary write in this app already does. Purely
+ * additive (never blocks the chat response): a failed insert here
+ * shouldn't ever surface as a chat error to the user.
+ */
+export async function recordChatUsage(
+  chatId: string,
+  userId: string,
+  usage: { inputTokens: number; outputTokens: number },
+): Promise<void> {
+  if (usage.inputTokens === 0 && usage.outputTokens === 0) return;
+  const admin = createAdminClient();
+  const { error } = await admin.from("chat_usage").insert({
+    chat_id: chatId,
+    user_id: userId,
+    input_tokens: usage.inputTokens,
+    output_tokens: usage.outputTokens,
+  });
+  if (error) console.error("[recordChatUsage]", error);
+}
+
 export async function deleteChat(chatId: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();

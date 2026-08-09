@@ -24,26 +24,32 @@ import {
 import type { ModuleKey } from "@/lib/modules";
 
 const NAV_ITEMS = [
-  { href: "/app/talk", label: "Talk", icon: BsStars, size: "size-7!", moduleKey: null },
+  {
+    href: "/app/talk",
+    label: "Talk",
+    icon: BsStars,
+    size: "size-6!",
+    moduleKey: null,
+  },
   {
     href: "/app/habits",
     label: "Habits",
     icon: PiPlantBold,
-    size: "size-7!",
+    size: "size-6!",
     moduleKey: "habits" as ModuleKey,
   },
   {
     href: "/app/personal-finance",
     label: "Personal Finance",
     icon: FaMoneyBill,
-    size: "size-7!",
+    size: "size-6!",
     moduleKey: "personal_finance" as ModuleKey,
   },
   {
     href: "/app/tasks",
     label: "Tasks",
     icon: FaTasks,
-    size: "size-6!",
+    size: "size-5!",
     moduleKey: "tasks" as ModuleKey,
   },
   {
@@ -53,12 +59,18 @@ const NAV_ITEMS = [
     size: "size-6!",
     moduleKey: "deep_work" as ModuleKey,
   },
-  { href: "/app/calendar", label: "Calendar", icon: Calendar, size: "size-7!", moduleKey: null },
+  {
+    href: "/app/calendar",
+    label: "Calendar",
+    icon: Calendar,
+    size: "size-5!",
+    moduleKey: null,
+  },
   {
     href: "/app/challenges",
     label: "Challenges",
     icon: Trophy,
-    size: "size-6!",
+    size: "size-5!",
     moduleKey: null,
   },
 ];
@@ -75,7 +87,8 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const visibleItems = NAV_ITEMS.filter(
-    (item) => item.moduleKey === null || enabledModules.includes(item.moduleKey),
+    (item) =>
+      item.moduleKey === null || enabledModules.includes(item.moduleKey),
   );
 
   return (
@@ -87,7 +100,7 @@ export function AppSidebar({
       <SidebarHeader className="flex flex-row items-center justify-start gap-2 bg-sidebar pt-4 group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:px-0!">
         <Link
           href="/app/talk"
-          className="flex items-center gap-2 pl-1 group-data-[collapsible=icon]:pl-0"
+          className="flex items-center gap-1 pl-2 group-data-[collapsible=icon]:pl-0"
         >
           <Image
             src={"/logo.png"}
@@ -135,8 +148,10 @@ export function AppSidebar({
               isActive={isActivePath(pathname, "/app/profile")}
               render={<Link href="/app/profile/account" />}
             >
-              <MdOutlineSettings className="text-sidebar-foreground size-6! group-data-[collapsible=icon]:size-4.5!" />
-              <span className="text-lg text-sidebar-foreground">Setting</span>
+              <MdOutlineSettings className="text-sidebar-foreground size-5! group-data-[collapsible=icon]:size-4.5!" />
+              <span className="text-base text-sidebar-foreground">
+                Settings
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
