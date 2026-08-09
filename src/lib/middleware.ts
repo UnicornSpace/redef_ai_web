@@ -72,7 +72,7 @@ export async function updateSession(request: NextRequest) {
   // miss one and accidentally 401 a real marketing page), we whitelist the
   // small set of prefixes that DO require auth and default everything else
   // to public.
-  const PROTECTED_PREFIXES = ["/app", "/onboarding"];
+  const PROTECTED_PREFIXES = ["/app", "/onboarding", "/admin"];
   // Habit invite links must stay crawlable without a session — chat apps
   // fetch this URL (and its opengraph-image sibling) to build a link
   // preview. The page itself still gates the actual "accept" action on

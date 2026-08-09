@@ -38,7 +38,7 @@ export function MobileTopHeader({
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4 md:hidden">
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between border-b border-line bg-paper/90 px-4 backdrop-blur md:hidden">
       <Link href="/app" className="flex items-center gap-2">
         <Image
           alt=""
