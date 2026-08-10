@@ -68,7 +68,14 @@ export async function POST(req: Request) {
   const preferences = await getUserPreferences();
 
   const result = streamText({
-    model: openai("gpt-4o"),
+    // openai("gpt-4o") defaults to OpenAI's Responses API (stateful — it
+    // references stored `msg_...` items server-side). Our chat history
+    // is stored in Supabase and replayed from there, so those ids don't
+    // exist on OpenAI's side across environments/orgs and the API
+    // returns "Item not found." `openai.chat(...)` uses the stateless
+    // Chat Completions API which is what this app was on before the
+    // ai@7 upgrade, and it works cross-environment.
+    model: openai.chat("gpt-4o"),
     // convertToModelMessages became async in ai@7 — used to return
     // ModelMessage[] directly, now returns Promise<ModelMessage[]>.
     messages: await convertToModelMessages(messages),
