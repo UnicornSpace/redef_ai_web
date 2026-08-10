@@ -16,7 +16,8 @@ export async function POST(req: Request) {
     // console.log("messages", messages)
     // console.log(req)
     const result = streamText({
-        model: openai('gpt-4o'),
+        // Stateless Chat Completions API — see comment in src/app/api/chat/route.ts.
+        model: openai.chat('gpt-4o'),
         messages: await convertToModelMessages(body.messages),
         stopWhen: stepCountIs(5),
         system: `hey you're a productivity assitent, you help user to get their work done.`,
