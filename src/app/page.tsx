@@ -14,6 +14,7 @@ import {
 import { FeaturesGrid } from "../components/new-landing-page-components/features";
 import { RedefFooter } from "../components/new-landing-page-components/footer";
 import { Hero } from "../components/new-landing-page-components/hero";
+import { HomepageSchema } from "../components/new-landing-page-components/homepage-schema";
 import { RedefNav } from "../components/new-landing-page-components/nav";
 import { SecuritySection } from "../components/new-landing-page-components/security";
 import { Divider, MotionProvider } from "../components/new-landing-page-components/shared";
@@ -27,11 +28,19 @@ export const metadata: Metadata = {
   title: "Redef AI — Your desire to productivity ends here",
   description:
     "Voice-first AI powered productivity system for your daily life. Calendar, tasks, habits, and deep work — one brain, spoken.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Redef AI — Your desire to productivity ends here",
+    description:
+      "Voice-first AI powered productivity system for your daily life. Calendar, tasks, habits, and deep work — one brain, spoken.",
+    url: "/",
+  },
 };
 
 export default function NewLandingPage() {
   return (
     <div className={`redef redef-root ${manrope.className}`}>
+      <HomepageSchema />
       <MotionProvider>
         <RedefNav />
         <main>

@@ -169,9 +169,9 @@ export function SecuritySection() {
         >
           <Eyebrow color="var(--rf-green-deep)">Trusted</Eyebrow>
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <h1 className="f-h2">
+            <h2 className="f-h2">
               Your life stays <span className="f-dim">your life.</span>
-            </h1>
+            </h2>
             <p className="f-lede" style={{ maxWidth: 460 }}>
               Redef uses enterprise-grade security with end-to-end encryption
               and secure data storage. Your productivity data is private and

@@ -1,5 +1,7 @@
 // "use client";
 
+import type { Metadata } from "next";
+import { NOINDEX_METADATA } from "@/lib/seo";
 import CTASection from "@/components/landingpage/cta-section";
 import DocumentationSection from "@/components/landingpage/documentation-section";
 import EffortlessIntegration from "@/components/landingpage/effortless-integration-updated";
@@ -20,6 +22,8 @@ import { SiSocialblade } from "react-icons/si";
 import BentoGrid from "@/components/landingpage/bento-grids";
 import { HeroSection } from "@/components/landingpage/hero-section";
 import Navbar from "@/components/landingpage/navbar";
+
+export const metadata: Metadata = NOINDEX_METADATA;
 
 export default function LandingPage() {
   return (

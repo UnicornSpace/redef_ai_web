@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
 import { HeroVideoDialog } from '@/components/ui/hero-video-dialog'
 import React from 'react'
+import { NOINDEX_METADATA } from '@/lib/seo'
+
+export const metadata: Metadata = NOINDEX_METADATA;
 
 const page = () => {
   // const intro_video = "https://www.youtube.com/watch?v=EHVqOWojgSA"

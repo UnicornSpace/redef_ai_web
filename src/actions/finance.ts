@@ -27,7 +27,7 @@ export async function createTransaction(input: {
   space?: string | null;
   description?: string | null;
   occurredOn: string;
-}): Promise<{ error?: string }> {
+}): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();
   if (authError || !user?.user) return { error: "Not signed in" };
@@ -36,8 +36,9 @@ export async function createTransaction(input: {
     return { error: "Enter an amount greater than 0" };
   }
 
+  const id = crypto.randomUUID();
   const { error } = await supabase.from("transactions").insert({
-    id: crypto.randomUUID(),
+    id,
     type: input.type,
     amount: input.amount,
     category: input.category?.trim() || null,
@@ -49,7 +50,12 @@ export async function createTransaction(input: {
   if (error) return { error: error.message };
 
   revalidatePath("/app/personal-finance");
-  return {};
+  // Returning the real id lets the client swap its optimistic (possibly
+  // non-UUID; see src/lib/uid.ts) placeholder id for a real one — without
+  // that swap, editing the just-added row before the next server render
+  // sent a fake id back through updateTransaction, which fails with
+  // "invalid input syntax for type uuid".
+  return { id };
 }
 
 export async function updateTransaction(

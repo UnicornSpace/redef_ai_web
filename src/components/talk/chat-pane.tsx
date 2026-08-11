@@ -7,15 +7,27 @@ import {
   CopyIcon,
   Loader2Icon,
   MicIcon,
+  PauseIcon,
+  PlayIcon,
   RefreshCcwIcon,
   SquareIcon,
   Volume2Icon,
   VolumeXIcon,
 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import { useLiveTranscription } from "@/hooks/use-live-transcription";
 import { useTTSQueue } from "@/hooks/use-tts-queue";
 import { renderToolOutput } from "@/components/talk/tool-renderers";
+import { ToolTrace } from "@/components/talk/tool-trace";
+import { messageToSpeech, toolPartToSpeech } from "@/components/talk/speakable";
 import {
   FaBullseye,
   FaCalendar,
@@ -26,12 +38,6 @@ import {
 import { toast } from "sonner";
 import { useSetNavHidden } from "@/components/app-shell/mobile-fab-context";
 import { Action, Actions } from "@/components/ai-elements/actions";
-import {
-  ChainOfThought,
-  ChainOfThoughtContent,
-  ChainOfThoughtHeader,
-  ChainOfThoughtStep,
-} from "@/components/ai-elements/chain-of-thought";
 import {
   Conversation,
   ConversationContent,
@@ -56,15 +62,9 @@ import {
 import { Response } from "@/components/ai-elements/response";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 import { TextShimmer } from "../text-shimmer";
+import { AudioLinesIcon, AudioLinesIconHandle } from "../ui/audio-lines";
 
 const SUGGESTIONS = [
   { icon: FaTasks, prompt: "What are my tasks for today?" },
@@ -73,58 +73,6 @@ const SUGGESTIONS = [
   { icon: FaBullseye, prompt: "What should I focus on today?" },
   { icon: FaCheckCircle, prompt: "How are my habits tracking?" },
 ];
-
-// Friendly labels for the tool-call steps shown in the Chain of Thought —
-// keyed by the exact `tool-<name>` part type the AI SDK emits, matching the
-// tool names registered in src/app/api/chat/route.ts.
-const TOOL_STEP_LABELS: Record<string, string> = {
-  "tool-getTasks": "Checking your tasks",
-  "tool-getSecretPin": "Getting your PIN",
-  "tool-addNewTask": "Adding a task",
-  "tool-markTaskAsCompleted": "Marking a task complete",
-  "tool-listDeepWorkProjects": "Checking your projects",
-  "tool-logDeepWorkSessions": "Logging your focus sessions",
-  "tool-getDeepWorkSummary": "Checking your focus time",
-  "tool-listHabits": "Checking your habits",
-  "tool-toggleHabitToday": "Updating a habit",
-  "tool-getFinanceSummary": "Checking your finances",
-  "tool-listRecentTransactions": "Fetching recent transactions",
-  "tool-addTransaction": "Logging a transaction",
-  "tool-updateMemory": "Updating memory",
-};
-
-function toolStepStatus(
-  state: ToolUIPart["state"],
-): "complete" | "active" | "pending" {
-  if (state === "output-available" || state === "output-error")
-    return "complete";
-  if (state === "input-available") return "active";
-  return "pending";
-}
-
-type PartGroup =
-  | { kind: "tools"; parts: ToolUIPart[] }
-  | { kind: "single"; part: UIMessage["parts"][number] };
-
-// Consecutive tool-call parts collapse into one Chain of Thought block
-// instead of a separate card per tool call — reads as one "here's what I
-// did" step list rather than a stack of unrelated boxes.
-function groupParts(parts: UIMessage["parts"]): PartGroup[] {
-  const groups: PartGroup[] = [];
-  for (const part of parts) {
-    if (part.type.startsWith("tool-")) {
-      const last = groups.at(-1);
-      if (last?.kind === "tools") {
-        last.parts.push(part as ToolUIPart);
-      } else {
-        groups.push({ kind: "tools", parts: [part as ToolUIPart] });
-      }
-      continue;
-    }
-    groups.push({ kind: "single", part });
-  }
-  return groups;
-}
 
 // Hardcoded acknowledgments spoken the instant the user hits send in
 // auto-speak mode — fills the "waiting for the model to start streaming"
@@ -184,6 +132,95 @@ function extractSpeakableChunk(
   return { chunk, advance: match[0].length };
 }
 
+// Chats loaded from storage can carry messages with a missing (or, rarer,
+// accidentally duplicated) `id` — this is the same root cause an earlier
+// fix in this file already worked around by keying React's list `key` off
+// the array index instead of `message.id`. That workaround doesn't extend
+// to identity that needs to survive the array being MUTATED (speech
+// progress tracking, and now prepending older messages via "load more"),
+// since a plain index shifts every time something is prepended. Fixing
+// it at the source — guarantee every message has a real, unique id the
+// moment it enters the component — means every downstream `message.id`
+// use (Play/Pause tracking, spoken-chars bookkeeping) just works.
+function normalizeMessageIds(list: UIMessage[], chatId: string): UIMessage[] {
+  const seen = new Set<string>();
+  return list.map((m, i) => {
+    const needsId = !m.id || seen.has(m.id);
+    const id = needsId ? `${chatId}-h${i}` : m.id;
+    seen.add(id);
+    return needsId ? { ...m, id } : m;
+  });
+}
+
+// Initial render shows only the most recent WINDOW_SIZE messages — a long
+// chat's full history is already in memory (loaded server-side into
+// `initialMessages`), but rendering all of it up front is unnecessary
+// render/layout cost and is also what was causing the page to visibly
+// open scrolled to the wrong place. "Load earlier messages" reveals more
+// of the already-in-memory history, LOAD_MORE_BATCH at a time.
+const WINDOW_SIZE = 20;
+const LOAD_MORE_BATCH = 20;
+
+/**
+ * Lives inside <Conversation> purely to reach the underlying scrollable
+ * element, which is only exposed via that component's context. Hands the
+ * element up to ChatPane (via a ref, not state — this fires on every
+ * scroll tick and we don't want a re-render per pixel) for two things:
+ * preserving scroll position when older messages get prepended, and
+ * auto-loading more once the user scrolls near the top.
+ */
+function ConversationScrollBridge({
+  scrollElRef,
+  onNearTop,
+}: {
+  scrollElRef: React.MutableRefObject<HTMLElement | null>;
+  onNearTop: () => void;
+}) {
+  const { scrollRef } = useStickToBottomContext();
+
+  useEffect(() => {
+    scrollElRef.current = scrollRef.current;
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      if (el.scrollTop < 120) onNearTop();
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [scrollRef, scrollElRef, onNearTop]);
+
+  return null;
+}
+
+/**
+ * Forces an instant jump to the bottom on mount — opening a chat should
+ * land on the latest message, not wherever a long history happens to lay
+ * out to. A single jump routinely lands short because markdown, webfonts,
+ * and the tool-output widgets each grow content height a beat after the
+ * first paint. So we re-pin across the next few frames and a couple of
+ * short timeouts to outlast that reflow. This only runs on mount, well
+ * before the user could have scrolled, so re-pinning can't fight them.
+ */
+function ScrollToBottomOnMount() {
+  const { scrollToBottom } = useStickToBottomContext();
+  useEffect(() => {
+    const pin = () => scrollToBottom("instant");
+    pin();
+    const raf1 = requestAnimationFrame(pin);
+    const raf2 = requestAnimationFrame(() => requestAnimationFrame(pin));
+    const t1 = window.setTimeout(pin, 150);
+    const t2 = window.setTimeout(pin, 400);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 export function ChatPane({
   chatId,
   initialMessages,
@@ -207,7 +244,14 @@ export function ChatPane({
   const [interimText, setInterimText] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const { enqueue: enqueueSpeech, stop: stopSpeech } = useTTSQueue();
+  const {
+    enqueue: enqueueSpeech,
+    stop: stopSpeech,
+    playOne: playSpeechFor,
+    isSpeaking,
+    isPaused: isSpeechPaused,
+    currentId: speakingMessageId,
+  } = useTTSQueue();
   // Base input value (without live-transcription in-progress interim) —
   // we render `input + interimText` so the tentative words show inline
   // while speaking, but only the settled `input` gets sent.
@@ -219,14 +263,92 @@ export function ChatPane({
   // we've already fed to the TTS queue, so streaming chunks don't get
   // re-spoken on each render.
   const spokenCharsRef = useRef<Record<string, number>>({});
-  const { messages, sendMessage, status, stop, regenerate } = useChat({
-    id: chatId,
-    messages: initialMessages,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      body: { chatId },
-    }),
-  });
+  // Which widget tool outputs (tasks/habits/finance/transactions) we've
+  // already spoken in auto-speak mode, keyed `${messageId}::${toolCallId}`.
+  // These carry visual-only data the caption omits, so auto-speak reads
+  // them once as they complete — same one-shot guarantee spokenCharsRef
+  // gives the streaming text.
+  const spokenToolPartsRef = useRef<Set<string>>(new Set());
+
+  // Full history normalized once per chat (ChatPane remounts fresh per
+  // chatId via `key={chatId}` in the parent, so these lazy initializers
+  // each run exactly once for this conversation) — everything else reads
+  // from this instead of the raw `initialMessages` prop.
+  const [fullHistory] = useState(() =>
+    normalizeMessageIds(initialMessages, chatId),
+  );
+  const [oldestLoadedIndex, setOldestLoadedIndex] = useState(() =>
+    Math.max(0, fullHistory.length - WINDOW_SIZE),
+  );
+  const [initialWindow] = useState(() => fullHistory.slice(-WINDOW_SIZE));
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+
+  const scrollElRef = useRef<HTMLElement | null>(null);
+  const scrollAnchorRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
+  // Mirror of oldestLoadedIndex + an in-flight flag, read synchronously by
+  // the scroll handler (which fires far more often than React re-renders)
+  // so a burst of scroll events near the top can't kick off overlapping
+  // loads or flash the spinner when there's nothing left to fetch.
+  const oldestLoadedIndexRef = useRef(oldestLoadedIndex);
+  const isLoadingOlderRef = useRef(false);
+  useEffect(() => {
+    oldestLoadedIndexRef.current = oldestLoadedIndex;
+  }, [oldestLoadedIndex]);
+
+  const { messages, sendMessage, status, stop, regenerate, setMessages } =
+    useChat({
+      id: chatId,
+      messages: initialWindow,
+      transport: new DefaultChatTransport({
+        api: "/api/chat",
+        body: { chatId },
+      }),
+    });
+
+  const loadOlderMessages = useCallback(() => {
+    if (isLoadingOlderRef.current) return;
+    if (oldestLoadedIndexRef.current <= 0) return;
+    isLoadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+    // The history is already in memory, so this is instant — but a bare
+    // synchronous prepend feels like a jarring jump. A short beat lets the
+    // spinner register as a real "loading more" moment, matching how the
+    // user expects reaching the top to behave.
+    window.setTimeout(() => {
+      setOldestLoadedIndex((current) => {
+        if (current <= 0) return current;
+        const nextStart = Math.max(0, current - LOAD_MORE_BATCH);
+        const older = fullHistory.slice(nextStart, current);
+        const el = scrollElRef.current;
+        if (el) {
+          scrollAnchorRef.current = {
+            scrollHeight: el.scrollHeight,
+            scrollTop: el.scrollTop,
+          };
+        }
+        setMessages((prev) => [...older, ...prev]);
+        return nextStart;
+      });
+      setIsLoadingOlder(false);
+      isLoadingOlderRef.current = false;
+    }, 350);
+  }, [fullHistory, setMessages]);
+
+  // Prepending older messages above the viewport otherwise makes
+  // everything the user was looking at jump down by however tall the
+  // newly-inserted content is — compensate by shifting scrollTop by
+  // exactly the amount scrollHeight grew, so nothing visibly moves.
+  useLayoutEffect(() => {
+    const anchor = scrollAnchorRef.current;
+    const el = scrollElRef.current;
+    if (anchor && el) {
+      el.scrollTop = anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight);
+      scrollAnchorRef.current = null;
+    }
+  }, [oldestLoadedIndex]);
 
   useSetNavHidden(messages.length > 0);
 
@@ -255,6 +377,14 @@ export function ChatPane({
     }
     for (const m of messages) {
       if (m.role !== "assistant") continue;
+      // Widget tool outputs already on screen shouldn't be re-spoken when
+      // the toggle flips on — mark them handled alongside the text.
+      for (const part of m.parts) {
+        if (!part.type.startsWith("tool-")) continue;
+        const toolPart = part as ToolUIPart;
+        if (toolPart.state !== "output-available") continue;
+        spokenToolPartsRef.current.add(`${m.id}::${toolPart.toolCallId}`);
+      }
       if (spokenCharsRef.current[m.id] !== undefined) continue;
       const fullText = m.parts
         .filter((p): p is { type: "text"; text: string } => p.type === "text")
@@ -275,6 +405,23 @@ export function ChatPane({
     const last = messages.at(-1);
     if (!last || last.role !== "assistant") return;
 
+    // Speak the widget tool outputs (tasks, habits, finance, transactions)
+    // as they finish — the caption deliberately omits this data, so without
+    // this the user would see it but never hear it. Ordered before the text
+    // below to match the on-screen layout (widget first, caption under it).
+    for (const part of last.parts) {
+      if (!part.type.startsWith("tool-")) continue;
+      const toolPart = part as ToolUIPart;
+      if (toolPart.state !== "output-available") continue;
+      const key = `${last.id}::${toolPart.toolCallId}`;
+      if (spokenToolPartsRef.current.has(key)) continue;
+      const spoken = toolPartToSpeech(toolPart);
+      if (spoken) enqueueSpeech(spoken, last.id);
+      // Mark handled even when not speakable, so we don't re-check it on
+      // every subsequent render.
+      spokenToolPartsRef.current.add(key);
+    }
+
     const fullText = last.parts
       .filter((p): p is { type: "text"; text: string } => p.type === "text")
       .map((p) => p.text)
@@ -292,14 +439,14 @@ export function ChatPane({
     if (isStreaming) {
       const next = extractSpeakableChunk(fullText, alreadySpoken);
       if (!next) return;
-      enqueueSpeech(next.chunk);
+      enqueueSpeech(next.chunk, last.id);
       spokenCharsRef.current[last.id] = alreadySpoken + next.advance;
     } else {
       // Streaming done — flush anything left after the last sentence
       // boundary we already spoke.
       const remaining = fullText.slice(alreadySpoken).trim();
       if (remaining) {
-        enqueueSpeech(remaining);
+        enqueueSpeech(remaining, last.id);
         spokenCharsRef.current[last.id] = fullText.length;
       }
     }
@@ -427,6 +574,21 @@ export function ChatPane({
     toast.success("Copied to clipboard");
   }
 
+  const audioIconRef = useRef<AudioLinesIconHandle>(null);
+
+  // Drive the AudioLines icon's wave animation from recording state. This
+  // must run in an effect, not directly in the render body (calling an
+  // imperative ref method during render is a side effect masquerading as
+  // a plain statement — it re-fires on every render instead of only on
+  // actual start/stop transitions).
+  useEffect(() => {
+    if (isRecording || liveTranscription.isListening) {
+      audioIconRef.current?.startAnimation();
+    } else {
+      audioIconRef.current?.stopAnimation();
+    }
+  }, [isRecording, liveTranscription.isListening]);
+
   return (
     <div className="flex w-full flex-col pt-8  md:pb-28 md:pt-16">
       {messages.length === 0 ? (
@@ -434,90 +596,49 @@ export function ChatPane({
           {greeting}
         </p>
       ) : null}
-      <Conversation className="flex-1 mb-16 ">
+      <Conversation className="flex-1 mb-16 " initial="instant">
+        <ScrollToBottomOnMount />
+        <ConversationScrollBridge
+          scrollElRef={scrollElRef}
+          onNearTop={loadOlderMessages}
+        />
         <ConversationContent>
+          {isLoadingOlder ? (
+            <div className="flex justify-center pb-3">
+              <Loader2Icon className="size-5 animate-spin text-body-muted" />
+            </div>
+          ) : null}
           {messages.map((message, mi) => {
             const isLastMessage = mi === messages.length - 1;
-            const groups = groupParts(message.parts);
+            // Every tool call for this message collapses into ONE trace —
+            // never a stack of separate "Working on it" parents, even when
+            // the model interleaves tool calls with text across steps.
+            // Their purpose-built widgets (task list, habit chips, finance
+            // cards) are promoted out below the trace so they read as
+            // first-class replies; the remaining text/reasoning follow in
+            // order.
+            const toolParts = message.parts.filter((p) =>
+              p.type.startsWith("tool-"),
+            ) as ToolUIPart[];
+            const widgets = toolParts
+              .map((p) => ({ part: p, custom: renderToolOutput(p) }))
+              .filter((x) => x.custom !== null);
+            const flowParts = message.parts.filter(
+              (p) => p.type === "text" || p.type === "reasoning",
+            );
 
             return (
               <div key={mi} className="whitespace-pre-wrap">
-                {groups.map((group, gi) => {
-                  if (group.kind === "tools") {
-                    const anyActive = group.parts.some(
-                      (p) => toolStepStatus(p.state) !== "complete",
-                    );
-                    // Split parts into (a) tools that have a purpose-built
-                    // widget in tool-renderers.tsx and (b) everything else.
-                    // The widgets get promoted out of the collapsible
-                    // "Working on it" indicator into the main response
-                    // flow — a task list should feel like a first-class
-                    // reply, not a debug detail buried inside a fold.
-                    const widgets = group.parts
-                      .map((p) => ({ part: p, custom: renderToolOutput(p) }))
-                      .filter((x) => x.custom !== null);
-
-                    return (
-                      <Fragment key={`${mi}-tools-${gi}`}>
-                        <ChainOfThought defaultOpen={anyActive}>
-                          <ChainOfThoughtHeader>
-                            Working on it
-                          </ChainOfThoughtHeader>
-                          <ChainOfThoughtContent>
-                            {group.parts.map((toolPart, ti) => (
-                              <ChainOfThoughtStep
-                                key={`${mi}-${gi}-${ti}`}
-                                label={
-                                  TOOL_STEP_LABELS[toolPart.type] ??
-                                  toolPart.type.replace("tool-", "")
-                                }
-                                status={toolStepStatus(toolPart.state)}
-                              >
-                                {toolPart.output != null ||
-                                toolPart.errorText != null ? (
-                                  <Tool defaultOpen={false}>
-                                    <ToolHeader
-                                      type={toolPart.type}
-                                      state={toolPart.state}
-                                    />
-                                    <ToolContent>
-                                      {toolPart.input != null ? (
-                                        <ToolInput input={toolPart.input} />
-                                      ) : null}
-                                      <ToolOutput
-                                        output={
-                                          toolPart.output != null ? (
-                                            <Response>
-                                              {String(toolPart.output)}
-                                            </Response>
-                                          ) : undefined
-                                        }
-                                        errorText={toolPart.errorText}
-                                      />
-                                    </ToolContent>
-                                  </Tool>
-                                ) : null}
-                              </ChainOfThoughtStep>
-                            ))}
-                          </ChainOfThoughtContent>
-                        </ChainOfThought>
-                        {widgets.map(({ part: w, custom }, wi) => (
-                          <div
-                            key={`${mi}-widget-${gi}-${wi}`}
-                            className="my-3"
-                          >
-                            {custom}
-                          </div>
-                        ))}
-                      </Fragment>
-                    );
-                  }
-
-                  const part = group.part;
-
+                {toolParts.length > 0 ? <ToolTrace parts={toolParts} /> : null}
+                {widgets.map(({ custom }, wi) => (
+                  <div key={`${mi}-widget-${wi}`} className="my-3">
+                    {custom}
+                  </div>
+                ))}
+                {flowParts.map((part, pi) => {
                   if (part.type === "text") {
                     return (
-                      <Fragment key={`${mi}-text-${gi}`}>
+                      <Fragment key={`${mi}-text-${pi}`}>
                         <Message from={message.role} className="">
                           <MessageContent
                             variant="contained"
@@ -527,7 +648,7 @@ export function ChatPane({
                           </MessageContent>
                         </Message>
                         {message.role === "assistant" ? (
-                          <Actions className="-mt-2 mb-2 ml-1">
+                          <Actions className="-mt-2 mb-2 md:gap-0! ml-1">
                             <Action
                               tooltip="Copy"
                               onClick={() => handleCopy(part.text)}
@@ -535,10 +656,27 @@ export function ChatPane({
                               <CopyIcon className="size-3.5" />
                             </Action>
                             <Action
-                              tooltip="Read aloud"
-                              onClick={() => enqueueSpeech(part.text)}
+                              tooltip={
+                                speakingMessageId === message.id &&
+                                isSpeaking &&
+                                !isSpeechPaused
+                                  ? "Pause"
+                                  : "Play"
+                              }
+                              onClick={() =>
+                                playSpeechFor(
+                                  messageToSpeech(message),
+                                  message.id,
+                                )
+                              }
                             >
-                              <Volume2Icon className="size-3.5" />
+                              {speakingMessageId === message.id &&
+                              isSpeaking &&
+                              !isSpeechPaused ? (
+                                <PauseIcon className="size-3.5" />
+                              ) : (
+                                <PlayIcon className="size-3.5" />
+                              )}
                             </Action>
                             {isLastMessage &&
                             status !== "streaming" &&
@@ -563,7 +701,7 @@ export function ChatPane({
                       message.parts.at(-1) === part;
                     return (
                       <Reasoning
-                        key={`${mi}-reasoning-${gi}`}
+                        key={`${mi}-reasoning-${pi}`}
                         className="w-full transition-all duration-300"
                         isStreaming={isReasoningStreaming}
                       >
@@ -661,9 +799,10 @@ export function ChatPane({
                 </PromptInputButton>
               </PromptInputTools>
               <PromptInputTools className="space-x-1">
-                {/* Mic button. When recording, wrap the icon in a relative
-                    span so the animate-ping ring sits behind it — gives a
-                    subtle "listening" pulse without moving the icon. */}
+                {/* Mic button — while recording/listening, the AudioLines
+                    icon's own wave animation (driven via ref above) is the
+                    "listening" indicator, replacing the earlier ping-pulse
+                    overlay. */}
                 <PromptInputButton
                   variant={
                     isRecording || liveTranscription.isListening
@@ -675,11 +814,7 @@ export function ChatPane({
                   // delay, which otherwise makes the mic feel unresponsive
                   // (or outright unclickable if a nearby tap steals focus
                   // during the delay window).
-                  className={cn(
-                    "p-4! touch-manipulation",
-                    (isRecording || liveTranscription.isListening) &&
-                      "relative",
-                  )}
+                  className="p-4! touch-manipulation"
                   onClick={handleMicClick}
                   aria-label={
                     isRecording || liveTranscription.isListening
@@ -687,18 +822,49 @@ export function ChatPane({
                       : "Record a voice note"
                   }
                 >
-                  {isRecording || liveTranscription.isListening ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-2 rounded-full bg-white/40 animate-ping"
-                    />
-                  ) : null}
                   {isTranscribing ? (
                     <Loader2Icon className="size-5 animate-spin" />
-                  ) : isRecording || liveTranscription.isListening ? (
-                    <SquareIcon className="size-5 relative" />
                   ) : (
-                    <MicIcon className="size-5" />
+                    // AudioLinesIcon stays mounted at all times — its ref
+                    // never re-attaches, so startAnimation()/stopAnimation()
+                    // always act on an already-settled component (same as
+                    // triggering it via hover, which is what it's built
+                    // for). Conditionally MOUNTING it only while recording
+                    // raced the very first frame against Motion's
+                    // useAnimation() controls and the wave never visibly
+                    // kicked in. Visibility is toggled with CSS instead.
+                    //
+                    // Each icon gets its own absolute inset-0 flex-center
+                    // wrapper rather than sizing the icon itself to fill
+                    // the box — Mic (lucide, 24x24 viewBox) and
+                    // AudioLines (custom svg) don't share the same
+                    // intrinsic proportions, so matching their raw boxes
+                    // left them visibly off-center relative to each
+                    // other. Flex-centering each one independently inside
+                    // an identically-sized overlay lands both dead-center
+                    // without hand-tuned margin offsets.
+                    <div className="relative size-5">
+                      <span
+                        className={cn(
+                          "absolute inset-0 flex items-center justify-center transition-opacity duration-150",
+                          isRecording || liveTranscription.isListening
+                            ? "opacity-0"
+                            : "opacity-100",
+                        )}
+                      >
+                        <MicIcon className="size-5" />
+                      </span>
+                      <span
+                        className={cn(
+                          "absolute inset-0 flex items-center justify-center transition-opacity duration-150",
+                          isRecording || liveTranscription.isListening
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      >
+                        <AudioLinesIcon ref={audioIconRef} size={20} />
+                      </span>
+                    </div>
                   )}
                 </PromptInputButton>
                 {/* Send button — hidden until the user has typed something

@@ -108,6 +108,42 @@ export async function createSession(input: {
   return {};
 }
 
+export async function updateSession(
+  sessionId: string,
+  input: {
+    projectId?: string | null;
+    startTime: string;
+    endTime: string;
+  },
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return { error: "Not signed in" };
+
+  const start = new Date(input.startTime);
+  const end = new Date(input.endTime);
+  const durationSeconds = Math.round((end.getTime() - start.getTime()) / 1000);
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return { error: "Session end must be after the start" };
+  }
+
+  const { error } = await supabase
+    .from("deepwork_sessions")
+    .update({
+      project_id: input.projectId || null,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      duration_in_minutes: Math.round(durationSeconds / 60),
+      duration_in_seconds: durationSeconds,
+    })
+    .eq("id", sessionId)
+    .eq("user_id", user.user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/app/deep-work");
+  return {};
+}
+
 export async function deleteSession(
   sessionId: string,
 ): Promise<{ error?: string }> {

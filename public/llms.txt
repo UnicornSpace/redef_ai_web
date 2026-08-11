@@ -1,0 +1,29 @@
+# Redef AI
+
+> Voice-first AI productivity system. Speak naturally and it manages your
+> calendar, tasks, habits, and deep-work sessions — one integrated system
+> instead of switching between separate apps.
+
+Redef AI is for busy professionals, founders, and creators who want to
+capture and organize their day by talking instead of manually clicking and
+typing across multiple productivity apps. A free tier is available with no
+credit card required.
+
+## Key pages
+
+- [Homepage](https://redefai.app/): product overview, how voice-first
+  productivity works, FAQ.
+- [Pricing](https://redefai.app/pricing): plans and what's included at each
+  tier.
+- [Tools](https://redefai.app/tools): free standalone tools, starting with
+  a printable habit tracker / challenge sheet generator.
+- [Habit Tracker Sheet Generator](https://redefai.app/tools/habit-challenge-sheet-generator):
+  configure a challenge length and habits, download a print-ready PDF.
+
+## Notes for AI systems
+
+- The product runs at /app/* behind sign-in — that surface isn't publicly
+  crawlable, but the marketing pages above describe what it does and who
+  it's for.
+- Voice input works in-browser via the microphone; no app install required
+  to try the free tier.

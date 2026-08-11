@@ -59,6 +59,14 @@ export function useLiveTranscription({
   const [supported, setSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  // Mobile Chrome (and some Android WebViews) has a well-known bug where
+  // it re-emits the SAME utterance as a "final" result multiple times as
+  // it keeps refining recognition — "I", then "I spent", then "I spent
+  // like", each marked isFinal:true — instead of one clean final per
+  // utterance. Naively appending every final transcript produces exactly
+  // the "I I spent I spent like I spent like..." duplication reported.
+  // Fix: track the last final transcript and only emit the DELTA past it.
+  const lastFinalRef = useRef("");
 
   useEffect(() => {
     setSupported(getConstructor() !== null);
@@ -76,6 +84,8 @@ export function useLiveTranscription({
       recognitionRef.current = null;
     }
 
+    lastFinalRef.current = "";
+
     const rec = new Ctor();
     rec.continuous = true;
     rec.interimResults = true;
@@ -87,7 +97,22 @@ export function useLiveTranscription({
         const res = event.results[i];
         const transcript = res[0]?.transcript ?? "";
         if (res.isFinal) {
-          onFinal(transcript);
+          const prev = lastFinalRef.current;
+          let delta = transcript;
+          if (prev) {
+            if (transcript.startsWith(prev)) {
+              // Same utterance, grown longer — only the new tail is new.
+              delta = transcript.slice(prev.length);
+            } else if (prev.startsWith(transcript)) {
+              // A shorter re-send of something we already have in full —
+              // stale duplicate, nothing new to add.
+              delta = "";
+            }
+            // else: genuinely a new, unrelated utterance — emit it whole.
+          }
+          lastFinalRef.current = transcript;
+          const trimmed = delta.trim();
+          if (trimmed) onFinal(trimmed);
         } else {
           interim += transcript;
         }

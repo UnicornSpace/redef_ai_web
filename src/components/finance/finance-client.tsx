@@ -29,13 +29,8 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Transaction, TransactionType } from "@/lib/types/productivity";
+import { uid } from "@/lib/uid";
 import { cn } from "@/lib/utils";
-
-function uid(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-}
 
 function dateKey(d: Date): string {
   const y = d.getFullYear();
@@ -266,6 +261,20 @@ export function FinanceClient({
       if (res.error) {
         setTransactions((prev) => prev.filter((t) => t.id !== optimistic.id));
         toast.error(res.error);
+        return;
+      }
+      // Swap the optimistic row's client-generated id for the real one the
+      // server just wrote. Without this, if the user immediately edits or
+      // deletes the just-added row, we'd send our fake id back through
+      // updateTransaction / deleteTransaction, which does .eq("id", ...)
+      // against a uuid column and errors with "invalid input syntax for
+      // type uuid".
+      if (res.id) {
+        setTransactions((prev) =>
+          prev.map((t) =>
+            t.id === optimistic.id ? { ...t, id: res.id as string } : t,
+          ),
+        );
       }
     });
   }

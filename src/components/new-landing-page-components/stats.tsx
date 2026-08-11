@@ -92,12 +92,12 @@ export function StatsSection() {
     <Container>
       <section style={{ padding: "5.5rem 0" }}>
         <Reveal>
-          <h1
+          <h2
             className="f-h2"
             style={{ maxWidth: 520, paddingBottom: "2.4rem" }}
           >
             Numbers that <span className="f-dim">speak.</span>
-          </h1>
+          </h2>
         </Reveal>
         <div className="f-stats-grid">
           {stats.map((stat, i) => (

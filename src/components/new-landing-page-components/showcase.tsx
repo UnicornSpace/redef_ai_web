@@ -91,12 +91,12 @@ export function Showcase() {
     <Container>
       <section style={{ padding: "5.5rem 0" }}>
         <Reveal>
-          <h1
+          <h2
             className="f-h2"
             style={{ maxWidth: 560, paddingBottom: "2.4rem" }}
           >
             Say it. See it. <span className="f-dim">Done.</span>
-          </h1>
+          </h2>
         </Reveal>
         <div className="f-showcase-grid">
           <ShowcaseColumn

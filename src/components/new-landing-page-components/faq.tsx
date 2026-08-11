@@ -147,12 +147,12 @@ export function FaqSection() {
     <Container>
       <section id="faq" style={{ padding: "5.5rem 0" }}>
         <Reveal>
-          <h1
+          <h2
             className="f-h2"
             style={{ paddingBottom: "0.9rem", maxWidth: 560 }}
           >
             Frequently Asked Questions
-          </h1>
+          </h2>
           <p className="f-lede" style={{ paddingBottom: "1.8rem" }}>
             Everything you need to know about our voice-first productivity
             system.

@@ -146,9 +146,9 @@ export function CtaSection() {
                 gap: "1.2rem",
               }}
             >
-              <h1 className="f-h2">
+              <h2 className="f-h2">
                 Ready to take control of your productivity?
-              </h1>
+              </h2>
               <p className="f-lede" style={{ maxWidth: 460 }}>
                 Join professionals who've replaced fragmented tools with one
                 voice-first system that brings clarity, focus, and trust back to

@@ -4,14 +4,23 @@ import { Manrope } from "next/font/google";
 import "@/styles/redef-theme.css";
 import { HabitBuilder } from "@/components/habit-tracker/habit-builder";
 import { MotionProvider } from "@/components/new-landing-page-components/shared";
+import { NOINDEX_METADATA } from "@/lib/seo";
 
 const manrope = Manrope({ subsets: ["latin"], display: "swap" });
 
+// This route has no Pomodoro-specific content — it's a copy-paste of
+// /tools/habit-challenge-sheet-generator/tool (same copy, same "Back to
+// the guide" link, even the same canonical pointing at that other page).
+// Noindexed until either a real Pomodoro tool is built here or the route
+// is removed — leaving it live and indexable would put duplicate content
+// under two URLs, one of which (this one) actively tells Google its
+// canonical lives elsewhere.
 export const metadata: Metadata = {
   title: "Build Your Habit Tracker Sheet | Redef AI",
   description:
     "Configure your challenge length and habits, then download a free, print-ready PDF habit tracker. Works for prayers, meals, water, deep work — any habit you type.",
-  alternates: { canonical: "/tools/habit-challenge-sheet-generator/tool" },
+  alternates: { canonical: "/tools/pomodoro-timer/tool" },
+  ...NOINDEX_METADATA,
 };
 
 export default function HabitTrackerToolPage() {

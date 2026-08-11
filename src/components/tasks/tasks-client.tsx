@@ -37,13 +37,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Task } from "@/lib/types/productivity";
+import { uid } from "@/lib/uid";
 import { cn } from "@/lib/utils";
-
-function uid(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-}
 
 type Filter = "active" | "all" | "completed";
 const ALL_CATEGORIES = "__all__";

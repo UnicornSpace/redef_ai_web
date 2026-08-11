@@ -37,6 +37,9 @@ export function RedefNav({ user = null }: { user?: { email: string } | null }) {
             <a className="f-nav-link" href="/tools">
               Tools
             </a>
+            <a className="f-nav-link" href="/pricing">
+              Pricing
+            </a>
             <a className="f-nav-link" href="/app/challenges">
               Challenges
             </a>

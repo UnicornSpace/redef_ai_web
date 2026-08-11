@@ -11,7 +11,11 @@ export function generateToolMetadata(
 ): Metadata {
   const fullTitle = `${tool.title} | Redef AI`;
   const fullUrl = `${baseUrl}${tool.canonicalUrl}`;
-  const ogImage = tool.ogImage ? `${baseUrl}${tool.ogImage}` : `${baseUrl}/og-default.png`;
+  // /og-default.png doesn't exist in /public — falling back to it silently
+  // 404s the OG image on any tool without its own `ogImage` set. /logo.png
+  // is a real (if not purpose-built 1200x630) stopgap; a proper marketing
+  // OG image is worth designing separately.
+  const ogImage = tool.ogImage ? `${baseUrl}${tool.ogImage}` : `${baseUrl}/logo.png`;
 
   return {
     title: fullTitle,

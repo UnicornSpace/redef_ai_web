@@ -8,51 +8,106 @@ import z from "zod";
  * receipt rows, not as a wall of JSON.
  */
 
-type RangeKey = "today" | "week" | "month" | "year" | "all";
+type RangeKey = "today" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 
-function rangeStartIso(range: RangeKey): string | null {
-  if (range === "all") return null;
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (range === "today") return start.toISOString();
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Returns a CLOSED [start, end] date-key range (both inclusive, both
+ * YYYY-MM-DD) for the given preset — critically, always with an upper
+ * bound. The previous version only applied a lower-bound filter, so
+ * every range silently included everything from that start date through
+ * today; "yesterday" wasn't even offered as an option, so the model
+ * would approximate it with "week" and return 7x too much.
+ */
+function rangeToDateKeys(
+  range: RangeKey,
+  startDate?: string,
+  endDate?: string,
+): { start: string; end: string } | null {
+  const today = new Date();
+  const todayKey = dateKey(today);
+
+  if (range === "today") return { start: todayKey, end: todayKey };
+
+  if (range === "yesterday") {
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    const key = dateKey(y);
+    return { start: key, end: key };
+  }
+
   if (range === "week") {
-    start.setDate(start.getDate() - 6);
-    return start.toISOString();
+    const s = new Date(today);
+    s.setDate(s.getDate() - 6);
+    return { start: dateKey(s), end: todayKey };
   }
+
   if (range === "month") {
-    start.setDate(start.getDate() - 29);
-    return start.toISOString();
+    const s = new Date(today);
+    s.setDate(s.getDate() - 29);
+    return { start: dateKey(s), end: todayKey };
   }
-  // year
-  start.setFullYear(start.getFullYear() - 1);
-  return start.toISOString();
+
+  if (range === "year") {
+    const s = new Date(today);
+    s.setFullYear(s.getFullYear() - 1);
+    return { start: dateKey(s), end: todayKey };
+  }
+
+  if (range === "custom") {
+    if (!startDate || !endDate) return null;
+    return { start: startDate, end: endDate };
+  }
+
+  // "all"
+  return { start: "0000-01-01", end: todayKey };
 }
 
 export const getFinanceSummaryTool = tool({
   description:
     "Summarize the user's personal finance for a range: total income, " +
     "total spent, net, and top spending categories. Use for questions " +
-    "like \"how much did I spend this month\" or \"what did I spend on\".",
+    "like \"how much did I spend yesterday\" or \"what did I spend on " +
+    "this month\". Use range='custom' with startDate+endDate for anything " +
+    "that doesn't fit a preset.",
   inputSchema: z.object({
     range: z
-      .enum(["today", "week", "month", "year", "all"])
-      .describe("today, last 7 days, last 30 days, last year, or all-time"),
+      .enum(["today", "yesterday", "week", "month", "year", "all", "custom"])
+      .describe(
+        "today, yesterday, last 7 days, last 30 days, last year, all-time, or custom",
+      ),
+    startDate: z
+      .string()
+      .optional()
+      .describe("YYYY-MM-DD, only with range='custom'"),
+    endDate: z
+      .string()
+      .optional()
+      .describe("YYYY-MM-DD, only with range='custom'"),
   }),
-  execute: async ({ range }) => {
+  execute: async ({ range, startDate, endDate }) => {
     const supabase = await createClient();
     const { data: user, error: authError } = await supabase.auth.getUser();
     if (authError || !user?.user) {
       return { error: authError?.message ?? "Not signed in" };
     }
-    const since = rangeStartIso(range as RangeKey);
-    let query = supabase
+
+    const bounds = rangeToDateKeys(range as RangeKey, startDate, endDate);
+    if (!bounds) return { error: "Invalid range" };
+
+    const { data, error } = await supabase
       .from("transactions")
       .select("type, amount, category")
       .eq("user_id", user.user.id)
-      .eq("is_deleted", false);
-    if (since) query = query.gte("occurred_on", since.slice(0, 10));
-
-    const { data, error } = await query;
+      .eq("is_deleted", false)
+      .gte("occurred_on", bounds.start)
+      .lte("occurred_on", bounds.end);
     if (error) return { error: error.message };
 
     let income = 0;
@@ -78,6 +133,8 @@ export const getFinanceSummaryTool = tool({
     return {
       data: {
         range,
+        startDate: bounds.start,
+        endDate: bounds.end,
         income: Number(income.toFixed(2)),
         expense: Number(expense.toFixed(2)),
         net: Number((income - expense).toFixed(2)),

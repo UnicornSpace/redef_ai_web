@@ -1,11 +1,14 @@
+import type { Metadata } from 'next';
 import { Button } from '@/components/ui/button'
 import Link from 'next/link';
 import React from 'react'
 import { FiArrowRight } from "react-icons/fi";
 import { TbArrowRight, TbArrowUpRight, TbCalendar, TbChecklist, TbSparkles } from "react-icons/tb";
 import Image from 'next/image';
+import { NOINDEX_METADATA } from '@/lib/seo';
 // import posthog from 'posthog-js';
 
+export const metadata: Metadata = NOINDEX_METADATA;
 
 const page = async () => {
   // posthog.capture('my event', { property: 'value' })
