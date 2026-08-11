@@ -144,7 +144,7 @@ export function Testimonials() {
                 gap: "1.2rem",
               }}
             >
-              <h1 className="f-h2">Friends of Redef</h1>
+              <h2 className="f-h2">Friends of Redef</h2>
               <p className="f-lede">People who got their time back.</p>
             </div>
             <div style={{ paddingTop: "0.75rem" }}>

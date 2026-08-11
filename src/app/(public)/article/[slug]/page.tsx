@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { NOINDEX_METADATA } from "@/lib/seo";
 import {
   RiLinkM,
   RiTimeLine,
@@ -10,6 +12,11 @@ import {
 } from "react-icons/ri";
 
 const tags = ["Engineering", "Performance", "Databases"];
+
+// Hardcoded placeholder content regardless of [slug], no generateMetadata,
+// not linked from anywhere. Noindexed until this is wired to real article
+// data (see /blog for the matching gap on the index side).
+export const metadata: Metadata = NOINDEX_METADATA;
 
 export default function ArticleBlock() {
   return (

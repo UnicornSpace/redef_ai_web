@@ -8,7 +8,9 @@ import {
   createSession,
   deleteProject,
   deleteSession,
+  updateSession,
 } from "@/actions/deepwork";
+import { TextEffect } from "@/components/text-effect";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,12 +38,26 @@ import type {
   DeepworkSessionWithProject,
   Project,
 } from "@/lib/types/productivity";
+import {
+  Card,
+  CardDescription,
+  CardFrame,
+  CardFrameDescription,
+  CardFrameFooter,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { SlidingNumber } from "../sliding-number";
+import { time } from "console";
+import { PlusIcon } from "../animated-icons/plus";
+import IxProject from "../animated-icons/project";
 
-function uid(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-}
+// See src/lib/uid.ts for why we can't use `crypto.randomUUID()` directly.
+import { uid } from "@/lib/uid";
 
 const NO_PROJECT = "__none__";
 
@@ -107,6 +123,7 @@ export function DeepWorkClient({
   const [manualOpen, setManualOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const now = new Date();
@@ -114,6 +131,11 @@ export function DeepWorkClient({
   const [manualStart, setManualStart] = useState(() => toLocalTimeInput(now));
   const [manualEnd, setManualEnd] = useState(() => toLocalTimeInput(now));
   const [manualProjectId, setManualProjectId] = useState(NO_PROJECT);
+
+  const [editDate, setEditDate] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [editProjectId, setEditProjectId] = useState(NO_PROJECT);
 
   useEffect(() => {
     if (!runningSince) return;
@@ -292,62 +314,154 @@ export function DeepWorkClient({
     });
   }
 
+  function handleOpenEditSession(session: DeepworkSessionWithProject) {
+    setEditingSessionId(session.id);
+    const start = new Date(session.start_time);
+    const end = new Date(session.end_time);
+    setEditDate(toLocalDateInput(start));
+    setEditStart(toLocalTimeInput(start));
+    setEditEnd(toLocalTimeInput(end));
+    setEditProjectId(session.project_id || NO_PROJECT);
+  }
+
+  function handleSaveEditSession() {
+    if (!editingSessionId) return;
+    const start = new Date(`${editDate}T${editStart}:00`);
+    const end = new Date(`${editDate}T${editEnd}:00`);
+    if (end.getTime() <= start.getTime()) {
+      toast.error("End time must be after the start time");
+      return;
+    }
+    const durationSeconds = Math.round(
+      (end.getTime() - start.getTime()) / 1000,
+    );
+    const projectId = editProjectId === NO_PROJECT ? null : editProjectId;
+    const previous = sessions.find((s) => s.id === editingSessionId);
+
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === editingSessionId
+          ? {
+              ...s,
+              project_id: projectId,
+              start_time: start.toISOString(),
+              end_time: end.toISOString(),
+              duration_in_seconds: durationSeconds,
+              duration_in_minutes: Math.round(durationSeconds / 60),
+              updated_at: new Date().toISOString(),
+            }
+          : s,
+      ),
+    );
+    setEditingSessionId(null);
+
+    startTransition(async () => {
+      const res = await updateSession(editingSessionId, {
+        projectId,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      });
+      if (res.error) {
+        if (previous) {
+          setSessions((prev) =>
+            prev.map((s) => (s.id === editingSessionId ? previous : s)),
+          );
+        }
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleDeleteEditingSession() {
+    if (!editingSessionId) return;
+    const session = sessions.find((s) => s.id === editingSessionId);
+    if (!session) return;
+    setEditingSessionId(null);
+    handleDeleteSession(editingSessionId);
+  }
+
   return (
     <div className="flex flex-col gap-6 px-4 pb-16 md:px-8 mt-6">
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <div className="rounded-2xl border border-line bg-paper p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-body-muted">
-            Today
-          </p>
-          <p className="tabular-nums text-xl font-extrabold text-ink">
-            {formatDuration(todaySeconds)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-paper p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-body-muted">
-            Last 7 days
-          </p>
-          <p className="tabular-nums text-xl font-extrabold text-ink">
-            {formatDuration(weekSeconds)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-line bg-paper p-6">
-        <span className="font-mono text-4xl font-bold tabular-nums text-ink">
-          {formatClock(elapsedSeconds)}
-        </span>
-        {runningSince && selectedProjectId !== NO_PROJECT ? (
-          <span className="text-sm text-body-muted">
-            {projects.find((p) => p.id === selectedProjectId)?.name}
+      <div className="grid grid-cols-12 gap-3">
+        <CardFrame className="min-w-0 max-h-24 col-span-3 max-w-44 flex-1">
+          <CardFrameHeader className="py-1">
+            <CardFrameTitle>Today</CardFrameTitle>
+          </CardFrameHeader>
+          <Card>
+            <CardPanel className="mx-auto min-w-0 py-4">
+              <p
+                className={cn(
+                  "break-words text-2xl text-center font-bold",
+                  // metricTextSizeClass(formatMoneyCompact(monthlyIncome)),
+                )}
+              >
+                {formatDuration(todaySeconds)}
+              </p>
+            </CardPanel>
+          </Card>
+        </CardFrame>
+        <CardFrame className="min-w-0 max-h-24 col-span-3 max-w-44 flex-1">
+          <CardFrameHeader className="py-1 mx-auto">
+            <CardFrameTitle>Last 7 days</CardFrameTitle>
+          </CardFrameHeader>
+          <Card>
+            <CardPanel className="mx-auto min-w-0 py-4">
+              <p
+                className={cn(
+                  "break-words text-2xl text-center font-bold",
+                  // metricTextSizeClass(formatMoneyCompact(monthlyExpense)),
+                )}
+              >
+                {formatDuration(weekSeconds)}
+              </p>
+            </CardPanel>
+          </Card>
+        </CardFrame>
+        <div className="flex w-full flex-col col-span-6 relative items-center gap-4 rounded-xl border border-line bg-paper p-6">
+          <span className="font-mono text-4xl font-bold tabular-nums text-ink">
+            {formatClock(elapsedSeconds)}
           </span>
-        ) : null}
-        {!runningSince ? (
-          <Button size="lg" onClick={() => setStartOpen(true)}>
-            <Play />
-            Start focus session
-          </Button>
-        ) : (
-          <Button size="lg" variant="destructive" onClick={handleStop}>
-            <Square />
-            Stop &amp; save
-          </Button>
-        )}
-        <div className="flex gap-4 text-sm">
-          <button
-            type="button"
-            onClick={() => setManualOpen(true)}
-            className="text-body-muted underline-offset-2 hover:text-ink hover:underline"
-          >
-            Log time manually
-          </button>
-          <button
-            type="button"
-            onClick={() => setProjectsOpen(true)}
-            className="text-body-muted underline-offset-2 hover:text-ink hover:underline"
-          >
-            Manage projects
-          </button>
+          {/*
+          <div className="flex items-center gap-0.5 font-mono text-5xl">
+            <SlidingNumber value={5} padStart={true} />
+            <span className="text-zinc-500">:</span>
+            <SlidingNumber value={5} padStart={true} /> <span className="text-zinc-500">:</span>
+          <SlidingNumber value={5} padStart={true} />
+          </div> */}
+          {runningSince && selectedProjectId !== NO_PROJECT ? (
+            <span className="text-sm text-body-muted">
+              {projects.find((p) => p.id === selectedProjectId)?.name}
+            </span>
+          ) : null}
+          {!runningSince ? (
+            <Button size="lg" onClick={() => setStartOpen(true)}>
+              <Play />
+              Start focus session
+            </Button>
+          ) : (
+            <Button size="lg" variant="destructive" onClick={handleStop}>
+              <Square />
+              Stop &amp; save
+            </Button>
+          )}
+          <div className="flex gap-1 text-sm absolute right-5 top-5 ">
+            <Button
+              size="icon-lg"
+              variant={"ghost"}
+              onClick={() => setManualOpen(true)}
+              className="text-body-muted underline-offset-2 hover:text-ink hover:underline"
+            >
+              <PlusIcon />
+            </Button>
+            <button
+              type="button"
+              onClick={() => setProjectsOpen(true)}
+              className="text-body-muted underline-offset-2 hover:text-ink hover:underline"
+            >
+              <IxProject className="size-5" />
+              {/* Manage projects */}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -387,32 +501,43 @@ export function DeepWorkClient({
                   {items.map((session, i) => (
                     <div
                       key={session.id}
-                      className={`flex items-center gap-3 px-3 py-2.5 ${
-                        i !== items.length - 1
-                          ? "border-b border-line"
-                          : ""
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleOpenEditSession(session)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleOpenEditSession(session);
+                        }
+                      }}
+                      className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 ${
+                        i !== items.length - 1 ? "border-b border-line" : ""
                       }`}
                     >
-                      <span className="flex-1 text-sm text-ink">
-                        {session.project?.name ?? "No project"}
-                        {session.is_manual_entry ? (
-                          <span className="ml-2 text-xs text-body-muted">
-                            manual
-                          </span>
-                        ) : null}
-                      </span>
+                      <div className="flex-1">
+                        <span className="text-sm text-ink">
+                          {session.project?.name ?? "No project"}
+                          {session.is_manual_entry ? (
+                            <span className="ml-2 text-xs text-body-muted">
+                              manual
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="flex gap-2 text-xs text-body-muted">
+                          {new Date(session.start_time).toLocaleTimeString(
+                            undefined,
+                            { hour: "2-digit", minute: "2-digit" },
+                          )}{" "}
+                          →{" "}
+                          {new Date(session.end_time).toLocaleTimeString(
+                            undefined,
+                            { hour: "2-digit", minute: "2-digit" },
+                          )}
+                        </span>
+                      </div>
                       <span className="tabular-nums text-sm font-medium text-body-muted">
                         {formatDuration(session.duration_in_seconds)}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDeleteSession(session.id)}
-                        aria-label="Delete session"
-                        className="text-body-muted"
-                      >
-                        <Trash2 />
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -547,9 +672,7 @@ export function DeepWorkClient({
                 />
               </div>
               <div className="flex flex-1 flex-col gap-1.5">
-                <span className="text-xs font-medium text-body-muted">
-                  End
-                </span>
+                <span className="text-xs font-medium text-body-muted">End</span>
                 <Input
                   type="time"
                   nativeInput
@@ -561,6 +684,101 @@ export function DeepWorkClient({
           </div>
           <DialogFooter>
             <Button onClick={handleManualSave}>Save session</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingSessionId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <TextEffect preset="fade-in-blur" per="word" speedReveal={1.5}>
+                Edit focus session
+              </TextEffect>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 px-6">
+            <Select
+              value={editProjectId}
+              onValueChange={(v) => setEditProjectId(v as string)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PROJECT}>No project</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-body-muted">Date</span>
+              <Input
+                type="date"
+                nativeInput
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <span className="text-xs font-medium text-body-muted">
+                  Started at
+                </span>
+                <Input
+                  type="time"
+                  nativeInput
+                  value={editStart}
+                  onChange={(e) => setEditStart(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <span className="text-xs font-medium text-body-muted">
+                  Ended at
+                </span>
+                <Input
+                  type="time"
+                  nativeInput
+                  value={editEnd}
+                  onChange={(e) => setEditEnd(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-body-muted">
+                Duration
+              </span>
+              <div className="text-sm font-semibold text-ink">
+                {editingSessionId
+                  ? formatDuration(
+                      Math.round(
+                        (new Date(`${editDate}T${editEnd}:00`).getTime() -
+                          new Date(`${editDate}T${editStart}:00`).getTime()) /
+                          1000,
+                      ),
+                    )
+                  : "—"}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleDeleteEditingSession}
+              className="text-rf-coral hover:text-rf-coral"
+            >
+              <Trash2 />
+              Delete
+            </Button>
+            <Button onClick={handleSaveEditSession}>Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

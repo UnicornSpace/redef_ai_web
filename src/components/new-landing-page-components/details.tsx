@@ -457,7 +457,7 @@ export function DetailsSection() {
             paddingBottom: "3.4rem",
           }}
         >
-          <h1 className="f-h2">Details that matter.</h1>
+          <h2 className="f-h2">Details that matter.</h2>
           <p className="f-lede">
             We sweat the small stuff, so your day feels effortless.
           </p>

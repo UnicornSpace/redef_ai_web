@@ -1,3 +1,8 @@
+import type { Metadata } from "next";
+import { NOINDEX_METADATA } from "@/lib/seo";
+
+export const metadata: Metadata = NOINDEX_METADATA;
+
 export default function ChallengePage() {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen py-2">

@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { NOINDEX_METADATA } from "@/lib/seo";
 
 const COPYWRITER_API_BASE =
   process.env.COPYWRITER_API_URL || "http://localhost:3000";
+
+// This page is unfinished — see the note where it's linked from robots.ts
+// disallow list. It fetches from an external CMS that falls back to
+// localhost in production if COPYWRITER_API_URL isn't set, links to
+// /blog/[slug] routes that don't exist yet, and has no styling. Noindexed
+// until it's actually wired up; don't remove this without fixing those.
+export const metadata: Metadata = NOINDEX_METADATA;
 
 export default async function BlogPage() {
   const res = await fetch(`${COPYWRITER_API_BASE}/api/v1/projects/redefai`, {

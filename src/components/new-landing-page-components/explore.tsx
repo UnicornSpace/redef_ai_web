@@ -627,13 +627,13 @@ export function Explore() {
     <Container>
       <section id="explore" style={{ padding: "3.5rem 0 5.5rem" }}>
         <Reveal>
-          <h1
+          <h2
             className="f-h2"
             style={{ maxWidth: 640, paddingBottom: "2.4rem" }}
           >
             Your day, organized{" "}
             <span className="f-dim">in a whole new way.</span>
-          </h1>
+          </h2>
         </Reveal>
         <div className="f-explore-grid">
           <Panel

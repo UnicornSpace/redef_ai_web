@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/admin";
 import { createClient } from "@/lib/server";
 import { displayNameOf } from "@/lib/avatar";
 import type { ModuleKey } from "@/lib/modules";
+import type { Profile, PublicProfile } from "@/lib/types/profile";
 
 export async function updateProfile({
   fullName,
@@ -32,14 +33,9 @@ export async function updateProfile({
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
-export interface Profile {
-  user_id: string;
-  username: string;
-  enabled_modules: ModuleKey[];
-  onboarded_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// Loose E.164-ish check — full validation/OTP verification is a follow-up;
+// this just keeps obviously-malformed input out.
+const PHONE_PATTERN = /^\+?[0-9()\-.\s]{7,20}$/;
 
 export async function getMyProfile(): Promise<Profile | null> {
   const supabase = await createClient();
@@ -78,6 +74,8 @@ export async function checkUsernameAvailable(
 export async function completeOnboarding(input: {
   username: string;
   enabledModules: ModuleKey[];
+  ageRange?: string | null;
+  phoneNumber?: string | null;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();
@@ -90,11 +88,18 @@ export async function completeOnboarding(input: {
     };
   }
 
+  const phoneNumber = input.phoneNumber?.trim() || null;
+  if (phoneNumber && !PHONE_PATTERN.test(phoneNumber)) {
+    return { error: "That phone number doesn't look right" };
+  }
+
   const { error } = await supabase.from("profiles").upsert(
     {
       user_id: user.user.id,
       username,
       enabled_modules: input.enabledModules,
+      age_range: input.ageRange || null,
+      phone_number: phoneNumber,
       onboarded_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
@@ -108,12 +113,40 @@ export async function completeOnboarding(input: {
   return {};
 }
 
-export interface PublicProfile {
-  userId: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  memberSince: string | null;
+/**
+ * Editable version of the onboarding questions (age, phone, enabled tools) —
+ * surfaced in Settings so a user can change their answers after the initial
+ * onboarding flow without re-doing the whole thing. Username isn't included
+ * here; changing it has its own uniqueness UX (checkUsernameAvailable) and
+ * isn't part of this ask.
+ */
+export async function updatePreferences(input: {
+  ageRange?: string | null;
+  phoneNumber?: string | null;
+  enabledModules: ModuleKey[];
+}): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return { error: "Not signed in" };
+
+  const phoneNumber = input.phoneNumber?.trim() || null;
+  if (phoneNumber && !PHONE_PATTERN.test(phoneNumber)) {
+    return { error: "That phone number doesn't look right" };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      age_range: input.ageRange || null,
+      phone_number: phoneNumber,
+      enabled_modules: input.enabledModules,
+    })
+    .eq("user_id", user.user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/app/profile/preferences");
+  revalidatePath("/app");
+  return {};
 }
 
 /**

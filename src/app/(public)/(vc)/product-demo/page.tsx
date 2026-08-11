@@ -1,7 +1,11 @@
+import type { Metadata } from 'next'
 import { HeroVideoDialog } from '@/components/ui/hero-video-dialog'
 import Link from 'next/link';
 import React from 'react'
 import { TbProgressAlert } from "react-icons/tb";
+import { NOINDEX_METADATA } from '@/lib/seo'
+
+export const metadata: Metadata = NOINDEX_METADATA;
 
 const page = () => {
   // const intro_video = "https://www.youtube.com/watch?v=EHVqOWojgSA"

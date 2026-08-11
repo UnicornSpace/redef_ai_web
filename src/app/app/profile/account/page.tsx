@@ -124,6 +124,20 @@ const AccountPage = async () => {
             <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />
           </Link>
           <Link
+            href="/app/profile/preferences"
+            className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-ink">
+                Preferences
+              </span>
+              <span className="text-xs text-body-muted">
+                Age, phone number, and enabled tools
+              </span>
+            </div>
+            <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />
+          </Link>
+          <Link
             href="/app/profile/referral"
             className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
           >

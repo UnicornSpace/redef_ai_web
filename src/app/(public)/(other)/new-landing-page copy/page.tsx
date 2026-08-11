@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { NOINDEX_METADATA } from "@/lib/seo";
 import "./family-theme.css";
 
 import { BlogSection } from "./components/blog";
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
   title: "Family — Your favorite crypto wallet",
   description:
     "Explore Ethereum with the best wallet for iOS. Interacting with crypto has never been so simple. (Design experiment clone)",
+  ...NOINDEX_METADATA,
 };
 
 export default function NewLandingPage() {

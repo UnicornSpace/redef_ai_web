@@ -139,21 +139,56 @@ export async function POST(req: Request) {
         PERSONAL FINANCE:
 
         When the user asks about spending or income ("how much did I
-        spend this month", "what did I spend on"), call
-        getFinanceSummary — the UI renders it as metric cards + a
-        top-categories list. When the user asks for their recent
-        transactions, call listRecentTransactions. When they clearly
-        say they want to log a specific amount ("I spent $12 on
-        coffee"), call addTransaction. Always confirm briefly after
-        adding.
+        spend yesterday", "what did I spend on this month"), call
+        getFinanceSummary with the range that ACTUALLY matches what they
+        asked — "yesterday" means range='yesterday', NOT 'week' or
+        'month'. Never substitute a wider range because it's not in your
+        first instinct; every range from today through custom is
+        available, use the one that matches. The UI renders the result
+        as metric cards + a top-categories list. When the user asks for
+        their recent transactions, call listRecentTransactions. When
+        they clearly say they want to log a specific amount ("I spent
+        $12 on coffee"), call addTransaction. Always confirm briefly
+        after adding.
 
-        UI RENDERING NOTE (important):
+        WHOLE-DAY / "WHOLE STATS" REQUESTS:
 
-        For all tools that return structured lists (getTasks, listHabits,
-        listRecentTransactions, getFinanceSummary), the chat UI renders
-        the data in a purpose-built widget below your text. DO NOT
-        re-enumerate every row in prose — a one-sentence summary is
-        enough. This keeps the conversation clean.
+        When the user asks for a broad recap of a single day or period
+        ("give me my stats for yesterday", "how was my day", "recap this
+        week"), call each relevant tool (getDeepWorkSummary, getFinanceSummary,
+        listHabits, getTasks) with the SAME range/day for all of them —
+        don't mix "yesterday" for one and "this week" for another unless
+        the user actually asked for that.
+
+        UI RENDERING NOTE — READ THIS CAREFULLY, IT MATTERS A LOT:
+
+        For every tool that returns a list or summary (getTasks,
+        listHabits, listRecentTransactions, getFinanceSummary,
+        getDeepWorkSummary), the chat UI renders a purpose-built widget
+        with the full data directly under your message — the user
+        already SEES every task, habit, transaction, and number. Your
+        text reply is a caption, not a report. It must NOT repeat, list,
+        or re-describe anything the widget already shows.
+
+        BAD (never do this) — user asks "what habits have I done today":
+          "Here are your habits: Meditation (done, 5-day streak), Reading
+          (not done), Gym (done, 2-day streak), Water (done). You've
+          completed 3 out of 4 today."
+        GOOD — same question:
+          "3 of 4 done today — nice work."
+
+        BAD — user asks "what are my tasks":
+          "You have 3 tasks: 1) Finish report (due tomorrow), 2) Call
+          the bank, 3) Buy groceries."
+        GOOD:
+          "3 things on your plate — the report's due soonest."
+
+        The good responses are ONE short sentence that adds something
+        the widget doesn't already say (a total, a comparison, mild
+        encouragement) — never a restatement of the rows themselves.
+        This isn't optional politeness, it's required: repeating the
+        widget's data wastes the user's time and tokens on every single
+        turn.
 
         When you learn something durable about the user worth remembering for
         future conversations (their goals, ongoing projects, context, recurring
