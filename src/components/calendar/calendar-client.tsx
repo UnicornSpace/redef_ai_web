@@ -2,6 +2,7 @@
 
 import {
   addMonths,
+  addWeeks,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -13,6 +14,7 @@ import {
   startOfMonth,
   startOfWeek,
   subMonths,
+  subWeeks,
 } from "date-fns";
 import {
   CalendarPlus,
@@ -110,17 +112,82 @@ function EventPill({ event }: { event: CalendarEvent }) {
   );
 }
 
-type ViewMode = "month" | "agenda";
+type ViewMode = "month" | "week" | "agenda";
 
 const MAX_PILLS_PER_DAY = 3;
+
+/**
+ * Compact at-a-glance strip that sits at the bottom of each calendar cell,
+ * rendering just the streams that actually have data for that day —
+ * anything with a zero count is silent, so empty days genuinely LOOK
+ * empty (not falsely padded with "0/0" placeholders).
+ *
+ * Intentionally NOT a set of rounded pills — that ate too much space in
+ * a cell already carrying up to 3 event pills. Plain colored numerals at
+ * 10-11px squeeze into ~50px total horizontal and read cleanly.
+ *
+ * Google events are already surfaced as event pills higher up in the
+ * cell, so no separate indicator here for them (that'd be double-counting).
+ */
+function DayCellSummary({
+  summary,
+}: {
+  summary: DaySummary | undefined;
+}) {
+  if (!summary) return null;
+  const habitsTotal = summary.habits.length;
+  const habitsDone = summary.habits.filter((h) => h.done).length;
+  const hasHabits = habitsTotal > 0;
+  const hasWork = summary.workSeconds > 0;
+  const hasFinance = summary.financeCount > 0;
+  if (!hasHabits && !hasWork && !hasFinance) return null;
+
+  const hours = summary.workSeconds / 3600;
+  const hoursLabel =
+    hours >= 10 ? `${Math.round(hours)}h` : `${hours.toFixed(1)}h`;
+
+  return (
+    <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1 text-[10px] font-semibold tabular-nums leading-none">
+      {hasHabits ? (
+        <span
+          className={cn(
+            habitsDone === habitsTotal
+              ? "text-rf-green-deep"
+              : "text-body-muted",
+          )}
+        >
+          {habitsDone}/{habitsTotal}
+        </span>
+      ) : null}
+      {hasWork ? (
+        <span className="text-rf-green-deep">{hoursLabel}</span>
+      ) : null}
+      {hasFinance ? (
+        // Hidden on mobile to conserve tap-target width. On md+ the cell
+        // has room for it alongside habits + focus without wrapping.
+        <span
+          className={cn(
+            "hidden md:inline",
+            summary.financeNet >= 0 ? "text-rf-green-deep" : "text-rf-coral",
+          )}
+        >
+          {summary.financeNet >= 0 ? "+" : "−"}
+          {Math.abs(Math.round(summary.financeNet))}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function MonthView({
   monthDate,
   events,
+  daySummaries,
   onSelectDay,
 }: {
   monthDate: Date;
   events: CalendarEvent[];
+  daySummaries: Record<string, DaySummary>;
   onSelectDay: (date: string) => void;
 }) {
   const days = useMemo(() => {
@@ -206,6 +273,101 @@ function MonthView({
                 </Popover>
               ) : null}
             </div>
+            {/* Strip showing which streams touched this day — silent for
+                any stream with zero data, so a truly empty day still
+                renders empty. */}
+            <DayCellSummary summary={daySummaries[key]} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 7-day view of the Mon-Sun week containing `focusDate`. Cells are the
+ * same shape as MonthView's but taller and unclamped on pill count — you
+ * see every scheduled event for the week without overflow popovers. The
+ * day-detail dialog still opens on click (via the same `onSelectDay`
+ * callback), keeping muscle memory consistent across the two views.
+ */
+function WeekView({
+  focusDate,
+  events,
+  daySummaries,
+  onSelectDay,
+}: {
+  focusDate: Date;
+  events: CalendarEvent[];
+  daySummaries: Record<string, DaySummary>;
+  onSelectDay: (date: string) => void;
+}) {
+  const days = useMemo(() => {
+    const start = startOfWeek(focusDate, { weekStartsOn: 1 });
+    const end = endOfWeek(focusDate, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [focusDate]);
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const e of events) {
+      const list = map.get(e.date) ?? [];
+      list.push(e);
+      map.set(e.date, list);
+    }
+    return map;
+  }, [events]);
+
+  return (
+    <div className="grid px-2 md:grid-cols-7 gap-1 mt-4">
+      {days.map((day) => {
+        const key = format(day, "yyyy-MM-dd");
+        const dayEvents = eventsByDay.get(key) ?? [];
+        return (
+          <div
+            key={key}
+            role="button"
+            aria-label={`${format(day, "EEEE, MMMM d")} details`}
+            tabIndex={0}
+            onClick={() => onSelectDay(key)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelectDay(key);
+              }
+            }}
+            className={cn(
+              "flex min-h-40 cursor-pointer flex-col gap-1 rounded-xl border border-line bg-paper p-2 transition-colors hover:border-rf-green-deep/40 md:min-h-56",
+              isToday(day) && "border-rf-green-deep",
+            )}
+          >
+            <div className="flex items-baseline justify-between px-1">
+              <span
+                className={cn(
+                  "text-[10px] font-bold uppercase tracking-wide text-body-muted",
+                  isToday(day) && "text-rf-green-deep",
+                )}
+              >
+                {format(day, "EEE")}
+              </span>
+              <span
+                className={cn(
+                  "text-sm font-semibold text-ink",
+                  isToday(day) && "text-rf-green-deep",
+                )}
+              >
+                {format(day, "d")}
+              </span>
+            </div>
+            {/* No MAX cap here — a week cell has enough vertical space
+                for the full day's events, so we don't need the
+                overflow-popover pattern MonthView uses. */}
+            <div className="flex flex-col gap-0">
+              {dayEvents.map((event) => (
+                <EventPill key={event.id} event={event} />
+              ))}
+            </div>
+            <DayCellSummary summary={daySummaries[key]} />
           </div>
         );
       })}
@@ -295,7 +457,12 @@ export function CalendarClient({
   googleCalendarConnected: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
-  const [monthDate, setMonthDate] = useState(() => new Date());
+  // Single source of truth for what the calendar is centered on. Month
+  // view treats it as "the month containing this date", week view as
+  // "the week containing this date"; the prev/next buttons step it by
+  // the current view's unit. Kept as `focusDate` (not `monthDate`) since
+  // it's no longer month-specific.
+  const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isConnecting, startConnectTransition] = useTransition();
 
@@ -310,10 +477,39 @@ export function CalendarClient({
     });
   }
 
+  // Nav semantics: step by month in month view, by week in week view. In
+  // agenda view the header hides the nav entirely (nothing to page).
+  function stepPrev() {
+    setFocusDate((d) => (viewMode === "week" ? subWeeks(d, 1) : subMonths(d, 1)));
+  }
+  function stepNext() {
+    setFocusDate((d) => (viewMode === "week" ? addWeeks(d, 1) : addMonths(d, 1)));
+  }
+
+  // Label shown between the prev/next buttons. Week view shows the actual
+  // week range (Mon-Sun), month view shows the month. Compact variants
+  // for the mobile header.
+  function periodLabel(compact: boolean): string {
+    if (viewMode === "week") {
+      const start = startOfWeek(focusDate, { weekStartsOn: 1 });
+      const end = endOfWeek(focusDate, { weekStartsOn: 1 });
+      if (isSameMonth(start, end)) {
+        return compact
+          ? `${format(start, "MMM d")}–${format(end, "d")}`
+          : `${format(start, "MMM d")} – ${format(end, "d")}`;
+      }
+      return compact
+        ? `${format(start, "MMM d")}–${format(end, "MMM d")}`
+        : `${format(start, "MMM d")} – ${format(end, "MMM d")}`;
+    }
+    return compact ? format(focusDate, "MMM yyyy") : format(focusDate, "MMMM yyyy");
+  }
+
   return (
     <div className="flex flex-col gap-4 px-1 pb-16 md:px-8 mt-6">
-      {/* Desktop / tablet header — full Month/Timeline tabs, spelled-out
-          month, and the nav + Today controls all visible at once. */}
+      {/* Desktop / tablet header — full Month/Week/Timeline tabs,
+          spelled-out period label, and the nav + Today controls all
+          visible at once. */}
       <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
         <div className="flex flex-wrap items-center gap-2">
           <Tabs
@@ -322,6 +518,7 @@ export function CalendarClient({
           >
             <TabsList>
               <TabsTab value="month">Month</TabsTab>
+              <TabsTab value="week">Week</TabsTab>
               <TabsTab value="agenda">Timeline</TabsTab>
             </TabsList>
           </Tabs>
@@ -345,31 +542,31 @@ export function CalendarClient({
             </Button>
           ) : null} */}
         </div>
-        {viewMode === "month" ? (
+        {viewMode !== "agenda" ? (
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label="Previous month"
-              onClick={() => setMonthDate((d) => subMonths(d, 1))}
+              aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+              onClick={stepPrev}
             >
               <ChevronLeft />
             </Button>
-            <span className="min-w-28 text-center text-sm font-semibold text-ink">
-              {format(monthDate, "MMMM yyyy")}
+            <span className="min-w-36 text-center text-sm font-semibold text-ink">
+              {periodLabel(false)}
             </span>
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label="Next month"
-              onClick={() => setMonthDate((d) => addMonths(d, 1))}
+              aria-label={viewMode === "week" ? "Next week" : "Next month"}
+              onClick={stepNext}
             >
               <ChevronRight />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setMonthDate(new Date())}
+              onClick={() => setFocusDate(new Date())}
             >
               Today
             </Button>
@@ -377,30 +574,35 @@ export function CalendarClient({
         ) : null}
       </div>
 
-      {/* Mobile header — month nav on the left, "Add task" + a "..." menu
-          (view switcher + Today) on the right, so it fits in one row. */}
+      {/* Mobile header — period nav on the left (hidden in agenda view
+          since there's nothing to page), "Add task" + a "..." menu (view
+          switcher + Today) on the right, so it fits in one row. */}
       <div className="flex items-center justify-between gap-2 md:hidden">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Previous month"
-            onClick={() => setMonthDate((d) => subMonths(d, 1))}
-          >
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-[4.5rem] text-center text-sm font-semibold text-ink">
-            {format(monthDate, "MMM yyyy")}
-          </span>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Next month"
-            onClick={() => setMonthDate((d) => addMonths(d, 1))}
-          >
-            <ChevronRight />
-          </Button>
-        </div>
+        {viewMode !== "agenda" ? (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+              onClick={stepPrev}
+            >
+              <ChevronLeft />
+            </Button>
+            <span className="min-w-[5.5rem] text-center text-sm font-semibold text-ink">
+              {periodLabel(true)}
+            </span>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label={viewMode === "week" ? "Next week" : "Next month"}
+              onClick={stepNext}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        ) : (
+          <span className="text-sm font-semibold text-ink">Timeline</span>
+        )}
         <div className="flex items-center gap-2">
           <Button
             variant="default"
@@ -425,6 +627,13 @@ export function CalendarClient({
                   <Check className="ml-auto text-rf-green-deep" />
                 ) : null}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setViewMode("week")}>
+                <LucideCalendarFold />
+                Week
+                {viewMode === "week" ? (
+                  <Check className="ml-auto text-rf-green-deep" />
+                ) : null}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setViewMode("agenda")}>
                 <TdesignComponentSteps1 />
                 Timeline
@@ -433,7 +642,7 @@ export function CalendarClient({
                 ) : null}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setMonthDate(new Date())}>
+              <DropdownMenuItem onClick={() => setFocusDate(new Date())}>
                 Today
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -443,8 +652,16 @@ export function CalendarClient({
 
       {viewMode === "month" ? (
         <MonthView
-          monthDate={monthDate}
+          monthDate={focusDate}
           events={events}
+          daySummaries={daySummaries}
+          onSelectDay={setSelectedDate}
+        />
+      ) : viewMode === "week" ? (
+        <WeekView
+          focusDate={focusDate}
+          events={events}
+          daySummaries={daySummaries}
           onSelectDay={setSelectedDate}
         />
       ) : (

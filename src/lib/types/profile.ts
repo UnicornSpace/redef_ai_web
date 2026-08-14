@@ -14,6 +14,9 @@ export interface Profile {
   enabled_modules: ModuleKey[];
   age_range: string | null;
   phone_number: string | null;
+  /** Opt-in for the aggregate habit heatmap on /u/[username]. Default TRUE
+      on the DB side; see migration 20260812_profile_public_activity_flag.sql. */
+  public_activity_visible: boolean;
   onboarded_at: string | null;
   created_at: string;
   updated_at: string;

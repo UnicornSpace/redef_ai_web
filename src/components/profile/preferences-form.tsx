@@ -15,15 +15,24 @@ export function PreferencesForm({
   defaultAgeRange,
   defaultPhoneNumber,
   defaultEnabledModules,
+  defaultPublicActivityVisible,
+  username,
 }: {
   defaultAgeRange: string | null;
   defaultPhoneNumber: string | null;
   defaultEnabledModules: ModuleKey[];
+  defaultPublicActivityVisible: boolean;
+  /** Used to show the user their own /u/… url next to the toggle so it's
+      obvious what they're controlling. */
+  username: string;
 }): React.ReactElement {
   const [ageRange, setAgeRange] = useState(defaultAgeRange ?? "");
   const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber ?? "");
   const [modules, setModules] = useState<Set<ModuleKey>>(
     () => new Set(defaultEnabledModules),
+  );
+  const [publicActivityVisible, setPublicActivityVisible] = useState(
+    defaultPublicActivityVisible,
   );
   const [isPending, startTransition] = useTransition();
 
@@ -31,7 +40,8 @@ export function PreferencesForm({
     ageRange !== (defaultAgeRange ?? "") ||
     phoneNumber !== (defaultPhoneNumber ?? "") ||
     modules.size !== defaultEnabledModules.length ||
-    !defaultEnabledModules.every((m) => modules.has(m));
+    !defaultEnabledModules.every((m) => modules.has(m)) ||
+    publicActivityVisible !== defaultPublicActivityVisible;
 
   function toggleModule(key: ModuleKey) {
     setModules((prev) => {
@@ -48,6 +58,7 @@ export function PreferencesForm({
         ageRange: ageRange || null,
         phoneNumber: phoneNumber.trim() || null,
         enabledModules: Array.from(modules),
+        publicActivityVisible,
       });
       if (res.error) toast.error(res.error);
       else toast.success("Preferences updated");
@@ -122,6 +133,36 @@ export function PreferencesForm({
             </label>
           );
         })}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-body-muted">
+          Public profile
+        </span>
+        <label
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors",
+            publicActivityVisible
+              ? "border-rf-green-deep/50 bg-g-green-pale"
+              : "border-line bg-white",
+          )}
+        >
+          <Checkbox
+            checked={publicActivityVisible}
+            onCheckedChange={(v) => setPublicActivityVisible(Boolean(v))}
+          />
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-ink">
+              Show my activity heatmap on{" "}
+              <span className="font-mono text-xs">/u/{username}</span>
+            </span>
+            <span className="text-xs text-body-muted">
+              Anyone with your public profile URL can see an aggregate
+              heatmap of days you completed a habit — no habit names, just
+              density. Turn this off if the pattern itself feels private.
+            </span>
+          </div>
+        </label>
       </div>
 
       <Button

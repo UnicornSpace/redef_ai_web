@@ -19,6 +19,8 @@ export default async function PreferencesPage() {
           defaultAgeRange={profile.age_range}
           defaultPhoneNumber={profile.phone_number}
           defaultEnabledModules={profile.enabled_modules ?? DEFAULT_ENABLED_MODULES}
+          defaultPublicActivityVisible={profile.public_activity_visible ?? true}
+          username={profile.username}
         />
       </div>
     </div>

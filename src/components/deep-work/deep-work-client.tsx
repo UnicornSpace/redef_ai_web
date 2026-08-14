@@ -109,9 +109,15 @@ function toLocalTimeInput(d: Date): string {
 export function DeepWorkClient({
   initialProjects,
   initialSessions,
+  belowMetricsSlot,
 }: {
   initialProjects: Project[];
   initialSessions: DeepworkSessionWithProject[];
+  /** Rendered right after the Today / Last-7-days / Timer row and BEFORE
+      the History list. Used by the page to inject server-fetched charts
+      (TimeRange + Waffle) without this client component knowing anything
+      about their data shape. */
+  belowMetricsSlot?: React.ReactNode;
 }) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [sessions, setSessions] =
@@ -203,6 +209,28 @@ export function DeepWorkClient({
       if (res.error) {
         setProjects((prev) => prev.filter((p) => p.id !== optimistic.id));
         toast.error(res.error);
+        return;
+      }
+      // Swap the optimistic (client-uid) project id for the real one the
+      // server just wrote. Without this, if the user immediately starts a
+      // focus session against this project, createSession sends the fake
+      // id and Postgres rejects the row with a projects_pkey FK violation
+      // ("insert or update on table 'deepwork_sessions' violates foreign
+      // key constraint 'deepwork_sessions_project_id_fkey'"). Also
+      // rewrites `selectedProjectId` if the user had already picked this
+      // project in the Start dialog before the server round-trip landed.
+      if (res.id) {
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === optimistic.id ? { ...p, id: res.id as string } : p,
+          ),
+        );
+        setSelectedProjectId((current) =>
+          current === optimistic.id ? (res.id as string) : current,
+        );
+        setManualProjectId((current) =>
+          current === optimistic.id ? (res.id as string) : current,
+        );
       }
     });
   }
@@ -382,42 +410,46 @@ export function DeepWorkClient({
 
   return (
     <div className="flex flex-col gap-6 px-4 pb-16 md:px-8 mt-6">
-      <div className="grid grid-cols-12 gap-3">
-        <CardFrame className="min-w-0 max-h-24 col-span-3 max-w-44 flex-1">
-          <CardFrameHeader className="py-1">
-            <CardFrameTitle>Today</CardFrameTitle>
-          </CardFrameHeader>
-          <Card>
-            <CardPanel className="mx-auto min-w-0 py-4">
-              <p
-                className={cn(
-                  "break-words text-2xl text-center font-bold",
-                  // metricTextSizeClass(formatMoneyCompact(monthlyIncome)),
-                )}
-              >
-                {formatDuration(todaySeconds)}
-              </p>
-            </CardPanel>
-          </Card>
-        </CardFrame>
-        <CardFrame className="min-w-0 max-h-24 col-span-3 max-w-44 flex-1">
-          <CardFrameHeader className="py-1 mx-auto">
-            <CardFrameTitle>Last 7 days</CardFrameTitle>
-          </CardFrameHeader>
-          <Card>
-            <CardPanel className="mx-auto min-w-0 py-4">
-              <p
-                className={cn(
-                  "break-words text-2xl text-center font-bold",
-                  // metricTextSizeClass(formatMoneyCompact(monthlyExpense)),
-                )}
-              >
-                {formatDuration(weekSeconds)}
-              </p>
-            </CardPanel>
-          </Card>
-        </CardFrame>
-        <div className="flex w-full flex-col col-span-6 relative items-center gap-4 rounded-xl border border-line bg-paper p-6">
+      <div className="grid md:grid-rows-1 grid-rows-2 md:grid-cols-12  gap-3">
+        <div className="min-w-0 flex  w-full md:flex-col  row-span-1 max-h-24 col-span-2 md:max-w-44 flex-1">
+          <CardFrame className="min-w-0 row-span-1 max-h-24 col-span-2 max-w-44 flex-1">
+            <CardFrameHeader className="py-1">
+              <CardFrameTitle>Today</CardFrameTitle>
+            </CardFrameHeader>
+            <Card>
+              <CardPanel className="mx-auto min-w-0 py-4">
+                <p
+                  className={cn(
+                    "break-words text-2xl text-center font-bold",
+                    // metricTextSizeClass(formatMoneyCompact(monthlyIncome)),
+                  )}
+                >
+                  {formatDuration(todaySeconds)}
+                </p>
+              </CardPanel>
+            </Card>
+          </CardFrame>
+          <CardFrame className="min-w-0 row-span-1 max-h-24 col-span-2 max-w-44 flex-1">
+            <CardFrameHeader className="py-1 mx-auto">
+              <CardFrameTitle>Last 7 days</CardFrameTitle>
+            </CardFrameHeader>
+            <Card>
+              <CardPanel className="mx-auto min-w-0 py-4">
+                <p
+                  className={cn(
+                    "break-words text-2xl text-center font-bold",
+                    // metricTextSizeClass(formatMoneyCompact(monthlyExpense)),
+                  )}
+                >
+                  {formatDuration(weekSeconds)}
+                </p>
+              </CardPanel>
+            </Card>
+          </CardFrame>
+        </div>
+
+        <div className="col-span-4">{belowMetricsSlot}</div>
+        <div className="flex w-full flex-col col-span-4 relative items-center gap-4 rounded-xl border border-line bg-paper p-6">
           <span className="font-mono text-4xl font-bold tabular-nums text-ink">
             {formatClock(elapsedSeconds)}
           </span>

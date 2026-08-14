@@ -3,14 +3,67 @@ import type { MetadataRoute } from "next";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://redefai.app";
 
 /**
- * No sitemap existed at all before this. Lists only the pages that are
- * real, finished, and actually meant to be found — deliberately excludes
- * the orphaned/experimental/investor-only pages under (other) and (vc),
- * the broken /blog + /article/[slug] scaffolding, and /tools/pomodoro-timer
- * (duplicated metadata from the habit-tracker tool, not its own content).
- * Those all carry `noindex` directly (see their page files) rather than
- * just being left out here — omission alone doesn't stop indexing if
- * something links to them.
+ * Single source of truth for pages we deliberately KEEP OUT of the sitemap.
+ * Each entry is the route path (no origin, no trailing slash) plus the
+ * reason. Both this file and robots.ts should stay consistent with it;
+ * the on-page `NOINDEX_METADATA` is still what actually blocks indexing.
+ *
+ * Add here when you add a new page that shouldn't be crawled — e.g. a
+ * signup funnel step, an investor-only landing page, an internal tool.
+ */
+export const SITEMAP_IGNORED_ROUTES: {
+  route: string;
+  reason: string;
+}[] = [
+  { route: "/waitlist", reason: "Signup funnel — not a discovery page." },
+  {
+    route: "/blog",
+    reason: "Unfinished CMS scaffolding, fetches from a stub API.",
+  },
+  {
+    route: "/article/[slug]",
+    reason: "Hardcoded placeholder content until CMS is wired.",
+  },
+  {
+    route: "/tools/pomodoro-timer",
+    reason:
+      "Placeholder route with no real pomodoro tool (duplicates habit-tracker metadata).",
+  },
+  {
+    route: "/tools/pomodoro-timer/tool",
+    reason: "Same as parent — no real content.",
+  },
+  { route: "/old-landing-page", reason: "Retired homepage clone." },
+  { route: "/new-landing-page copy", reason: "Off-brand design experiment." },
+  { route: "/testing-page", reason: "Design/testing scratch." },
+  { route: "/stats", reason: "Investor-only page." },
+  { route: "/download-beta", reason: "Investor-only page." },
+  { route: "/product-demo", reason: "Investor-only page." },
+  { route: "/1-min-video", reason: "Investor-only page." },
+  {
+    route: "/whyproductivity",
+    reason: "Empty stub, not linked from anywhere yet.",
+  },
+  {
+    route: "/challenges/[challenge]",
+    reason: "Empty stub, no real content.",
+  },
+  {
+    route: "/app/**",
+    reason: "Signed-in surface — not crawlable and not useful publicly.",
+  },
+  { route: "/auth/**", reason: "Login/callback flow." },
+  { route: "/admin/**", reason: "Admin-only." },
+  { route: "/api/**", reason: "API endpoints, not documents." },
+  { route: "/onboarding", reason: "Post-signup flow, gated by auth." },
+];
+
+/**
+ * Sitemap of pages that are real, finished, and meant to be found. If
+ * you're about to add something here, first ask: does it belong in
+ * SITEMAP_IGNORED_ROUTES above? Omission alone doesn't stop indexing if
+ * something links to the page — the on-page `NOINDEX_METADATA` in the
+ * ignored routes is the real gate; this list is just the invitation.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -45,12 +98,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.6,
-    },
-    {
-      url: `${SITE_URL}/waitlist`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.5,
     },
   ];
 }
