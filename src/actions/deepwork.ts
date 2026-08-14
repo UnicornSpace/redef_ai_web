@@ -22,7 +22,9 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
-export async function createProject(name: string): Promise<{ error?: string }> {
+export async function createProject(
+  name: string,
+): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();
   if (authError || !user?.user) return { error: "Not signed in" };
@@ -30,13 +32,18 @@ export async function createProject(name: string): Promise<{ error?: string }> {
   const trimmed = name.trim();
   if (!trimmed) return { error: "Project name is required" };
 
+  const id = crypto.randomUUID();
   const { error } = await supabase
     .from("projects")
-    .insert({ id: crypto.randomUUID(), name: trimmed, user_id: user.user.id });
+    .insert({ id, name: trimmed, user_id: user.user.id });
   if (error) return { error: error.message };
 
   revalidatePath("/app/deep-work");
-  return {};
+  // Returning the real server-side id lets the client swap out the
+  // optimistic uid()-generated placeholder — without that, starting a
+  // session against a just-created project sends a project_id that
+  // doesn't exist in the projects table, violating the FK.
+  return { id };
 }
 
 export async function deleteProject(
@@ -161,3 +168,57 @@ export async function deleteSession(
   revalidatePath("/app/deep-work");
   return {};
 }
+
+function dayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Daily focus minutes for a rolling window ending today. Zero-fills any
+ * missing day so nivo's TimeRange draws every cell (blank days included)
+ * instead of skipping them, which would look like a truncated chart.
+ * Default window: 90 days.
+ */
+export async function getDeepworkDailyMinutes(
+  windowDays = 90,
+): Promise<{ day: string; value: number }[]> {
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return [];
+
+  const today = new Date();
+  const start = new Date(today);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (windowDays - 1));
+
+  const { data, error } = await supabase
+    .from("deepwork_sessions")
+    .select("start_time, duration_in_seconds")
+    .eq("user_id", user.user.id)
+    .eq("is_deleted", false)
+    .gte("start_time", start.toISOString());
+  if (error) return [];
+
+  const minutesByDay = new Map<string, number>();
+  for (const row of data ?? []) {
+    const key = dayKey(new Date(row.start_time));
+    minutesByDay.set(
+      key,
+      (minutesByDay.get(key) ?? 0) + (row.duration_in_seconds ?? 0) / 60,
+    );
+  }
+
+  // Zero-fill every day in the window so the chart draws a full band.
+  const points: { day: string; value: number }[] = [];
+  for (let i = 0; i < windowDays; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = dayKey(d);
+    points.push({ day: key, value: Math.round(minutesByDay.get(key) ?? 0) });
+  }
+  return points;
+}
+

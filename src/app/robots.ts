@@ -41,6 +41,7 @@ export default function robots(): MetadataRoute.Robots {
     "/article/",
     "/tools/pomodoro-timer",
     "/challenges/",
+    "/waitlist",
   ];
 
   return {

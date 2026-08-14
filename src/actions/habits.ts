@@ -9,6 +9,7 @@ import type {
   HabitChecklistItem,
   HabitCollaborator,
   HabitListItem,
+  HabitPriority,
   HabitType,
 } from "@/lib/types/productivity";
 
@@ -202,6 +203,9 @@ export async function createHabit(input: {
   goalComparator?: GoalComparator;
   goalNumber?: number;
   goalUnit?: string | null;
+  /** Null / omitted = unspecified priority. Focus view sorts by
+      high → medium → low → unspecified. */
+  priority?: HabitPriority | null;
 }): Promise<{
   error?: string;
   id?: string;
@@ -224,7 +228,11 @@ export async function createHabit(input: {
   }
   const id = crypto.randomUUID();
 
-  const { error } = await supabase.from("habits").insert({
+  // Only include `priority` in the INSERT when the caller actually
+  // passed a non-undefined value — that way installs that haven't yet
+  // run the 20260813 priority migration keep creating habits without
+  // hitting "column 'priority' of relation 'habits' does not exist".
+  const row: Record<string, unknown> = {
     id,
     name,
     description: input.description?.trim() || null,
@@ -238,7 +246,10 @@ export async function createHabit(input: {
     goal_comparator: type === "number" ? (input.goalComparator ?? "at_least") : null,
     goal_number: type === "number" ? input.goalNumber : null,
     goal_unit: type === "number" ? input.goalUnit?.trim() || null : null,
-  });
+  };
+  if (input.priority !== undefined) row.priority = input.priority;
+
+  const { error } = await supabase.from("habits").insert(row);
   if (error) return { error: error.message };
 
   const items = (input.checklistItems ?? []).filter((i) => i.name.trim());
@@ -283,6 +294,9 @@ export async function updateHabit(
     goalComparator?: GoalComparator;
     goalNumber?: number;
     goalUnit?: string | null;
+    /** Pass `null` to explicitly clear the priority, or omit to leave it
+        unchanged. */
+    priority?: HabitPriority | null;
   },
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
@@ -292,10 +306,10 @@ export async function updateHabit(
   const name = input.name.trim();
   if (!name) return { error: "Habit name is required" };
 
-  // Only touch goal_* if the caller actually passed them — an undefined
-  // goalNumber for a boolean/checklist habit shouldn't null out fields
-  // we don't own, and for a number habit an undefined goalNumber means
-  // "keep it as is".
+  // Only touch goal_* / priority if the caller actually passed them — an
+  // undefined goalNumber for a boolean/checklist habit shouldn't null out
+  // fields we don't own. `priority: null` explicitly clears it; omitting
+  // it leaves it as-is.
   const patch: Record<string, unknown> = {
     name,
     description: input.description?.trim() || null,
@@ -306,6 +320,7 @@ export async function updateHabit(
   if (input.goalNumber !== undefined) patch.goal_number = input.goalNumber;
   if (input.goalComparator !== undefined) patch.goal_comparator = input.goalComparator;
   if (input.goalUnit !== undefined) patch.goal_unit = input.goalUnit?.trim() || null;
+  if (input.priority !== undefined) patch.priority = input.priority;
 
   const { error } = await supabase
     .from("habits")

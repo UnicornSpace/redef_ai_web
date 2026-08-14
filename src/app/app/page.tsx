@@ -1,10 +1,12 @@
 import { Flame } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { getMyActivityHeatmap } from "@/actions/activity";
 import { listSessions } from "@/actions/deepwork";
 import { listActiveGoals } from "@/actions/goals";
 import { listHabits } from "@/actions/habits";
 import { listTasks } from "@/actions/tasks";
+import { ActivityHeatmap } from "@/components/activity/activity-heatmap";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { ActiveGoalsClient } from "@/components/goals/active-goals-client";
 import { HomeTasksWidget } from "@/components/tasks/home-tasks-widget";
@@ -176,6 +178,32 @@ async function TasksWidgetData() {
   return <HomeTasksWidget initialTasks={tasks} />;
 }
 
+async function ActivityYearCard() {
+  const { points, from, to } = await getMyActivityHeatmap();
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
+          Your year, all activity
+        </span>
+        <span className="tabular-nums text-xs text-body-muted">
+          {points.length} active days
+        </span>
+      </div>
+      <ActivityHeatmap
+        points={points}
+        from={from}
+        to={to}
+        emptyMessage="Track a habit or log a focus session to start filling in your year."
+      />
+    </div>
+  );
+}
+
+function ActivityYearSkeleton() {
+  return <Skeleton className="h-52 w-full rounded-2xl" />;
+}
+
 export default async function DashboardHomePage() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -190,6 +218,9 @@ export default async function DashboardHomePage() {
         className="py-0 my-4 "
       />
       <div className="flex flex-col gap-3 px-4 pb-10 md:px-8">
+        <Suspense fallback={<ActivityYearSkeleton />}>
+          <ActivityYearCard />
+        </Suspense>
         <Suspense fallback={<GoalsSkeleton />}>
           <ActiveGoalsData />
         </Suspense>

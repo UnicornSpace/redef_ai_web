@@ -124,6 +124,7 @@ export async function updatePreferences(input: {
   ageRange?: string | null;
   phoneNumber?: string | null;
   enabledModules: ModuleKey[];
+  publicActivityVisible?: boolean;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();
@@ -134,13 +135,20 @@ export async function updatePreferences(input: {
     return { error: "That phone number doesn't look right" };
   }
 
+  // Only touch public_activity_visible if the caller passed it explicitly —
+  // an undefined shouldn't null it out.
+  const patch: Record<string, unknown> = {
+    age_range: input.ageRange || null,
+    phone_number: phoneNumber,
+    enabled_modules: input.enabledModules,
+  };
+  if (input.publicActivityVisible !== undefined) {
+    patch.public_activity_visible = input.publicActivityVisible;
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .update({
-      age_range: input.ageRange || null,
-      phone_number: phoneNumber,
-      enabled_modules: input.enabledModules,
-    })
+    .update(patch)
     .eq("user_id", user.user.id);
   if (error) return { error: error.message };
 

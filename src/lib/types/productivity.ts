@@ -13,6 +13,7 @@ export interface Task {
 export type HabitType = "boolean" | "checklist" | "smart_checklist" | "number";
 export type HabitPeriod = "daily" | "weekly" | "custom";
 export type GoalComparator = "at_least" | "less_than" | "exactly";
+export type HabitPriority = "high" | "medium" | "low";
 
 export interface Habit {
   id: string;
@@ -46,6 +47,10 @@ export interface Habit {
   goal_number: number | null;
   goal_unit: string | null;
   goal_comparator: GoalComparator | null;
+
+  // Null = unspecified. Sort order in the Focus view is high → medium →
+  // low → unspecified.
+  priority: HabitPriority | null;
 }
 
 export interface HabitChecklistItem {

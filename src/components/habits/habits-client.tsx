@@ -18,6 +18,7 @@ import {
   updateHabit,
 } from "@/actions/habits";
 import { useRegisterFab } from "@/components/app-shell/mobile-fab-context";
+import { FocusView } from "@/components/habits/focus-view";
 import { AvatarGroup } from "@/components/ui/avatar-group";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ import type {
   Habit,
   HabitChecklistItem,
   HabitListItem,
+  HabitPriority,
   HabitType,
 } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
@@ -115,6 +117,13 @@ function computeStreak(completed: Set<string>, today: Date): number {
 }
 
 type ViewMode = "weekly" | "monthly";
+// Top-level page layout — orthogonal to the per-card weekly/monthly
+// toggle above. "focus" is the new default checklist-first view; "cards"
+// keeps the masonry grid we had before, since some habits (with
+// heatmaps, checklists, number progress bars) benefit from the fuller
+// per-habit surface. Weekly/monthly only meaningfully applies to the
+// cards layout — Focus shows its own today-centered 7-day strip.
+type LayoutMode = "focus" | "cards";
 
 const WEEKS_BY_MODE: Record<ViewMode, number> = { weekly: 1, monthly: 6 };
 // Two-letter weekday labels (Mon = 0). Only used for the monthly grid;
@@ -177,6 +186,61 @@ function goalBlurb(habit: Habit): string | null {
     habit.goal_unit ?? "",
   ].filter(Boolean);
   return parts.join(" ");
+}
+
+const PRIORITY_OPTIONS: {
+  value: HabitPriority | null;
+  label: string;
+  activeClass: string;
+}[] = [
+  { value: null, label: "None", activeClass: "border-body-muted bg-line/60 text-ink" },
+  { value: "low", label: "Low", activeClass: "border-body-muted bg-body-muted/20 text-ink" },
+  {
+    value: "medium",
+    label: "Medium",
+    activeClass: "border-rf-amber bg-rf-amber/20 text-rf-amber",
+  },
+  {
+    value: "high",
+    label: "High",
+    activeClass: "border-rf-coral bg-rf-coral/20 text-rf-coral",
+  },
+];
+
+/**
+ * Shared four-way segmented picker for the priority field, used in both
+ * the create-habit dialog and the edit-habit dialog. Kept as one
+ * component so their visual/labels stay identical.
+ */
+function PriorityPicker({
+  value,
+  onChange,
+}: {
+  value: HabitPriority | null;
+  onChange: (v: HabitPriority | null) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {PRIORITY_OPTIONS.map((opt) => {
+        const isActive = value === opt.value;
+        return (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "rounded-full border px-2 py-1 text-xs font-semibold transition-colors",
+              isActive
+                ? opt.activeClass
+                : "border-line bg-white text-body-muted hover:border-body-muted",
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function buildGridDays(today: Date, weeks: number): Date[] {
@@ -515,6 +579,9 @@ function HabitCard({
     habit.goal_number != null ? String(habit.goal_number) : "",
   );
   const [editGoalUnit, setEditGoalUnit] = useState(habit.goal_unit ?? "");
+  const [editPriority, setEditPriority] = useState<HabitPriority | null>(
+    habit.priority,
+  );
   const [, startTransition] = useTransition();
   const today = useMemo(() => new Date(), []);
   const todayKey = dateKey(today);
@@ -528,6 +595,58 @@ function HabitCard({
   const childrenDoneToday = children.filter((c) =>
     (c.completed_dates ?? []).includes(todayKey),
   ).length;
+
+  // Today's progress as a 0..1 ratio. Drives the card's background tint
+  // so a glance at the grid reads "how am I doing today" — empty for
+  // untouched, saturated green when done.
+  //
+  // Boolean cards are excluded because they already have a strong
+  // done/not-done affordance: the today cell in the strip lights up
+  // green. Adding a second signal on the same card just for that would
+  // read as noise. Smart_checklist cards are excluded for the same
+  // reason (each child row already communicates its own state).
+  const progress = (() => {
+    if (habit.type === "checklist") {
+      const items = habit.checklistItems ?? [];
+      const required = items.filter((i) => !i.is_optional);
+      if (required.length === 0) return 0;
+      const doneRequired = completedItemIds.filter((id) =>
+        required.some((i) => i.id === id),
+      ).length;
+      return Math.min(1, doneRequired / required.length);
+    }
+    if (habit.type === "number") {
+      if (!habit.goal_number || habit.goal_number <= 0) return 0;
+      const value = loggedValue ?? 0;
+      if (habit.goal_comparator === "less_than") {
+        // Under the cap = "done" (100% tint). At or over = 0%. Between
+        // makes no meaningful gradient for a "stay below" goal.
+        return value < habit.goal_number ? 1 : 0;
+      }
+      return Math.min(1, value / habit.goal_number);
+    }
+    return 0;
+  })();
+  // Map ratio → one of 5 tint buckets so cards visually snap rather than
+  // shifting subtly on every log — a card at 40% vs 45% shouldn't look
+  // different, but a card at 0/40/70/100 should be obviously distinct.
+  const tintBucket =
+    progress <= 0
+      ? 0
+      : progress < 0.34
+        ? 1
+        : progress < 0.67
+          ? 2
+          : progress < 1
+            ? 3
+            : 4;
+  const tintClass = [
+    "bg-paper",
+    "bg-g-green-pale/30",
+    "bg-g-green-pale/60",
+    "bg-g-green-pale",
+    "bg-g-green-pale border-rf-green-deep/40",
+  ][tintBucket];
 
   const linkableHabits = ownedHabits.filter(
     (h) =>
@@ -636,6 +755,7 @@ function HabitCard({
     setEditGoalComparator(habit.goal_comparator ?? "at_least");
     setEditGoalNumber(habit.goal_number != null ? String(habit.goal_number) : "");
     setEditGoalUnit(habit.goal_unit ?? "");
+    setEditPriority(habit.priority);
     setEditOpen(true);
   }
 
@@ -656,6 +776,7 @@ function HabitCard({
       description: editDescription.trim() || null,
       category: editCategory.trim() || null,
       end_date: editEndDate || null,
+      priority: editPriority,
     };
     if (habit.type === "number") {
       patch.goal_number = parsedGoal;
@@ -671,6 +792,7 @@ function HabitCard({
         description: editDescription.trim() || null,
         category: editCategory.trim() || null,
         endDate: editEndDate || null,
+        priority: editPriority,
         ...(habit.type === "number"
           ? {
               goalComparator: editGoalComparator,
@@ -810,7 +932,12 @@ function HabitCard({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-line bg-paper p-4">
+    <div
+      className={cn(
+        "flex flex-col gap-4 rounded-xl border border-line p-4 transition-colors",
+        tintClass,
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -1227,6 +1354,16 @@ function HabitCard({
               />
             </div>
 
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-body-muted">
+                Priority
+              </span>
+              <PriorityPicker
+                value={editPriority}
+                onChange={setEditPriority}
+              />
+            </div>
+
             {habit.type === "number" ? (
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-body-muted">
@@ -1398,6 +1535,7 @@ export function HabitsClient({
   initialHabits: HabitListItem[];
 }) {
   const [habits, setHabits] = useState<HabitListItem[]>(initialHabits);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("focus");
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<HabitType>("boolean");
@@ -1411,6 +1549,7 @@ export function HabitsClient({
   const [goalComparator, setGoalComparator] = useState<GoalComparator>("at_least");
   const [goalNumber, setGoalNumber] = useState("");
   const [goalUnit, setGoalUnit] = useState("");
+  const [priority, setPriority] = useState<HabitPriority | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
@@ -1426,6 +1565,7 @@ export function HabitsClient({
     setGoalComparator("at_least");
     setGoalNumber("");
     setGoalUnit("");
+    setPriority(null);
   }
 
   function handleAddChecklistItem() {
@@ -1461,6 +1601,7 @@ export function HabitsClient({
     const submittedCategory = category.trim() || null;
     const submittedStartedAt = startedAt;
     const submittedEndDate = endDate || null;
+    const submittedPriority = priority;
     resetForm();
 
     startTransition(async () => {
@@ -1475,6 +1616,7 @@ export function HabitsClient({
         goalComparator: submittedComparator,
         goalNumber: submittedType === "number" ? parsedGoal : undefined,
         goalUnit: submittedUnit || null,
+        priority: submittedPriority,
       });
       if (res.error || !res.id) {
         toast.error(res.error ?? "Couldn't create habit");
@@ -1520,6 +1662,7 @@ export function HabitsClient({
           submittedType === "number" ? submittedUnit || null : null,
         goal_comparator:
           submittedType === "number" ? submittedComparator : null,
+        priority: submittedPriority,
         isCollaboration: false,
         collaborators: [],
         checklistItems:
@@ -1560,23 +1703,142 @@ export function HabitsClient({
     );
   }
 
+  /**
+   * Focus-view handlers. Each one mirrors the equivalent one on the
+   * HabitCard — same server call, same optimistic-then-reconcile shape
+   * — but wired to bubble the mutation back through onUpdated so both
+   * the Focus and Cards views see the same fresh state instantly
+   * (state lives in `habits`; router.refresh() would be a wasted RTT).
+   */
+  function todayDateKey(): string {
+    const t = new Date();
+    const y = t.getFullYear();
+    const m = String(t.getMonth() + 1).padStart(2, "0");
+    const d = String(t.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function handleToggleHabitFromFocus(habit: HabitListItem) {
+    const todayKey = todayDateKey();
+    const currentDates = habit.completed_dates ?? [];
+    const nextDates = currentDates.includes(todayKey)
+      ? currentDates.filter((x) => x !== todayKey)
+      : [...currentDates, todayKey];
+    handleUpdated(habit.id, { completed_dates: nextDates });
+
+    startTransition(async () => {
+      const res = habit.isCollaboration
+        ? await toggleCollaboratorDate(habit.id, todayKey)
+        : await toggleHabitDate(habit.id, todayKey);
+      if (res.error) {
+        handleUpdated(habit.id, { completed_dates: currentDates });
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleToggleChecklistItemFromFocus(
+    habitId: string,
+    itemId: string,
+  ) {
+    const todayKey = todayDateKey();
+    const habit = habits.find((h) => h.id === habitId);
+    if (!habit) return;
+    const currentItems = habit.todayCompletedItemIds ?? [];
+    const currentDates = habit.completed_dates ?? [];
+    const nextItems = currentItems.includes(itemId)
+      ? currentItems.filter((x) => x !== itemId)
+      : [...currentItems, itemId];
+    handleUpdated(habitId, { todayCompletedItemIds: nextItems });
+
+    startTransition(async () => {
+      const res = await toggleChecklistItem(habitId, todayKey, itemId);
+      if (res.error) {
+        handleUpdated(habitId, { todayCompletedItemIds: currentItems });
+        toast.error(res.error);
+        return;
+      }
+      // Server tells us whether required-items threshold is now met,
+      // which flips `completed_dates` for today. Reconcile that here so
+      // FocusView's "done today" split immediately reflects it.
+      if (res.dayComplete !== undefined) {
+        const hasToday = currentDates.includes(todayKey);
+        if (res.dayComplete && !hasToday) {
+          handleUpdated(habitId, {
+            completed_dates: [...currentDates, todayKey],
+          });
+        } else if (!res.dayComplete && hasToday) {
+          handleUpdated(habitId, {
+            completed_dates: currentDates.filter((d) => d !== todayKey),
+          });
+        }
+      }
+    });
+  }
+
+  function handleLogNumberFromFocus(habitId: string, value: number) {
+    const todayKey = todayDateKey();
+    const habit = habits.find((h) => h.id === habitId);
+    if (!habit) return;
+    const previousValue = habit.todayNumericValue ?? null;
+    const previousDates = habit.completed_dates ?? [];
+    handleUpdated(habitId, { todayNumericValue: value });
+
+    startTransition(async () => {
+      const res = await logNumericValue(habitId, todayKey, value);
+      if (res.error) {
+        handleUpdated(habitId, { todayNumericValue: previousValue });
+        toast.error(res.error);
+        return;
+      }
+      if (res.dayComplete !== undefined) {
+        const hasToday = previousDates.includes(todayKey);
+        if (res.dayComplete && !hasToday) {
+          handleUpdated(habitId, {
+            completed_dates: [...previousDates, todayKey],
+          });
+        } else if (!res.dayComplete && hasToday) {
+          handleUpdated(habitId, {
+            completed_dates: previousDates.filter((d) => d !== todayKey),
+          });
+        }
+      }
+    });
+  }
+
   useRegisterFab(
     { label: "Add habit", icon: Plus, onClick: () => setOpen(true) },
     [],
   );
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-16 md:px-8 mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs
-          value={viewMode}
-          onValueChange={(value) => setViewMode(value as ViewMode)}
-        >
-          <TabsList>
-            <TabsTab value="weekly">Weekly</TabsTab>
-            <TabsTab value="monthly">Monthly</TabsTab>
-          </TabsList>
-        </Tabs>
+    <div className="flex flex-col gap-4 px-4 pb-16 md:px-8 mt-6">
+      {/* Desktop / tablet — full row with both toggles + Add habit
+          button. Hidden on mobile (< md) where the button is replaced by
+          the FAB and the tabs move inline just above the habits list. */}
+      <div className="hidden md:flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            value={layoutMode}
+            onValueChange={(value) => setLayoutMode(value as LayoutMode)}
+          >
+            <TabsList>
+              <TabsTab value="focus">Focus</TabsTab>
+              <TabsTab value="cards">Cards</TabsTab>
+            </TabsList>
+          </Tabs>
+          {layoutMode === "cards" ? (
+            <Tabs
+              value={viewMode}
+              onValueChange={(value) => setViewMode(value as ViewMode)}
+            >
+              <TabsList>
+                <TabsTab value="weekly">Weekly</TabsTab>
+                <TabsTab value="monthly">Monthly</TabsTab>
+              </TabsList>
+            </Tabs>
+          ) : null}
+        </div>
         <ResponsiveDialog
           open={open}
           onOpenChange={(next) => {
@@ -1730,6 +1992,15 @@ export function HabitsClient({
                   card once it's created.
                 </p>
               ) : null}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-body-muted">
+                  Priority
+                </span>
+                <PriorityPicker
+                  value={priority}
+                  onChange={setPriority}
+                />
+              </div>
               <div className="flex gap-3">
                 <div className="flex flex-1 flex-col gap-1.5">
                   <span className="text-xs font-medium text-body-muted">
@@ -1764,6 +2035,66 @@ export function HabitsClient({
         </ResponsiveDialog>
       </div>
 
+      {/* Mobile-only compact pill row — hides the full TabsList (which
+          eats an extra ~40px of vertical space) and inlines the Focus /
+          Cards toggle immediately above the habits list. Weekly/Monthly
+          only relevant to Cards; hidden here to keep the strip minimal. */}
+      <div className="flex items-center gap-2 md:hidden">
+        <button
+          type="button"
+          onClick={() => setLayoutMode("focus")}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+            layoutMode === "focus"
+              ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
+              : "border-line bg-white text-body-muted",
+          )}
+        >
+          Focus
+        </button>
+        <button
+          type="button"
+          onClick={() => setLayoutMode("cards")}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+            layoutMode === "cards"
+              ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
+              : "border-line bg-white text-body-muted",
+          )}
+        >
+          Cards
+        </button>
+        {layoutMode === "cards" ? (
+          <>
+            <span aria-hidden className="h-4 w-px bg-line" />
+            <button
+              type="button"
+              onClick={() => setViewMode("weekly")}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                viewMode === "weekly"
+                  ? "border-body-muted bg-line/40 text-ink"
+                  : "border-line bg-white text-body-muted",
+              )}
+            >
+              Weekly
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("monthly")}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                viewMode === "monthly"
+                  ? "border-body-muted bg-line/40 text-ink"
+                  : "border-line bg-white text-body-muted",
+              )}
+            >
+              Monthly
+            </button>
+          </>
+        ) : null}
+      </div>
+
       {habits.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -1776,6 +2107,13 @@ export function HabitsClient({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
+      ) : layoutMode === "focus" ? (
+        <FocusView
+          habits={habits}
+          onToggleHabit={handleToggleHabitFromFocus}
+          onToggleChecklistItem={handleToggleChecklistItemFromFocus}
+          onLogNumber={handleLogNumberFromFocus}
+        />
       ) : (
         // CSS multi-column masonry — plain grid left tall/short cards next
         // to each other with dead space at the bottom of the short one
