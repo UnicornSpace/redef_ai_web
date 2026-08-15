@@ -1,6 +1,7 @@
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 import { getMyReferrals, getUserPreferences } from "@/actions/chat";
+import { getMyProfile } from "@/actions/profile";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { LogoutButton } from "@/components/logout-button";
 import { DisplayNameForm } from "@/components/profile/display-name-form";
@@ -25,10 +26,11 @@ function summarizePreferences(
 
 const AccountPage = async () => {
   const supabase = await createClient();
-  const [{ data }, preferences, { referrals }] = await Promise.all([
+  const [{ data }, preferences, { referrals }, profile] = await Promise.all([
     supabase.auth.getUser(),
     getUserPreferences(),
     getMyReferrals(),
+    getMyProfile(),
   ]);
   const email = data.user?.email;
   const fullName = data.user?.user_metadata?.full_name as string | undefined;
@@ -49,43 +51,84 @@ const AccountPage = async () => {
         description="Your Redef AI account details."
       />
       <div className="flex flex-col gap-6 px-4 pb-10 md:px-8">
-        <div className="flex items-center gap-4">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- external
-            // Google-hosted photo; next/image would need the host
-            // allowlisted in next.config.ts for one small avatar.
-            <img
-              alt=""
-              className="size-14 shrink-0 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-              src={avatarUrl}
-            />
-          ) : (
-            <span
-              className={cn(
-                "flex size-14 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white",
-                accentClass,
-              )}
-            >
-              {initials}
-            </span>
-          )}
-          <div className="flex flex-col">
-            <span className="font-semibold text-lg text-ink">
-              {displayName}
-            </span>
-            <span className="text-sm text-body-muted">{email ?? "—"}</span>
-            {createdAt ? (
-              <span className="text-xs text-body-muted">
-                Member since{" "}
-                {new Date(createdAt).toLocaleDateString(undefined, {
-                  month: "long",
-                  year: "numeric",
-                })}
+        {/* Whole avatar+name block is the click target for the user's
+            public profile — matches the mental model users have from
+            most social apps ("tap my photo to see my page"). Falls back
+            to a plain, non-clickable block if we somehow don't have a
+            username on the profile row. */}
+        {profile?.username ? (
+          <Link
+            href={`/u/${profile.username}`}
+            className="group flex items-center gap-4 rounded-2xl transition-colors hover:bg-white/40"
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- external
+              // Google-hosted photo; next/image would need the host
+              // allowlisted in next.config.ts for one small avatar.
+              <img
+                alt=""
+                className="size-14 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+                src={avatarUrl}
+              />
+            ) : (
+              <span
+                className={cn(
+                  "flex size-14 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white",
+                  accentClass,
+                )}
+              >
+                {initials}
               </span>
-            ) : null}
+            )}
+            <div className="flex flex-col">
+              <span className="font-semibold text-lg text-ink">
+                {displayName}
+              </span>
+              <span className="text-sm text-body-muted">{email ?? "—"}</span>
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-rf-green-deep group-hover:underline">
+                View public profile
+                <ExternalLinkIcon size={12} />
+              </span>
+              {createdAt ? (
+                <span className="text-xs text-body-muted">
+                  Member since{" "}
+                  {new Date(createdAt).toLocaleDateString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              ) : null}
+            </div>
+          </Link>
+        ) : (
+          <div className="flex items-center gap-4">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- external
+              <img
+                alt=""
+                className="size-14 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+                src={avatarUrl}
+              />
+            ) : (
+              <span
+                className={cn(
+                  "flex size-14 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white",
+                  accentClass,
+                )}
+              >
+                {initials}
+              </span>
+            )}
+            <div className="flex flex-col">
+              <span className="font-semibold text-lg text-ink">
+                {displayName}
+              </span>
+              <span className="text-sm text-body-muted">{email ?? "—"}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-paper p-6">
           <div className="flex flex-col gap-1">

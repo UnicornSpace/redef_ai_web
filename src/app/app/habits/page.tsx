@@ -1,9 +1,6 @@
 import { Suspense } from "react";
 import { listHabits } from "@/actions/habits";
-import {
-  CardGridSkeleton,
-  PageHeader,
-} from "@/components/app-shell/page-header";
+import { CardGridSkeleton } from "@/components/app-shell/page-header";
 import { HabitsClient } from "@/components/habits/habits-client";
 
 async function HabitsData() {
@@ -11,14 +8,14 @@ async function HabitsData() {
   return <HabitsClient initialHabits={habits} />;
 }
 
+// PageHeader is rendered INSIDE HabitsClient rather than here so the
+// Focus/Cards tabs can sit inline with the "Habits" title on mobile —
+// otherwise the tabs live in a separate row below the server-rendered
+// header and eat vertical space that mobile users can't spare.
 export default function HabitsPage() {
   return (
     <div className="flex w-full flex-col">
-      <PageHeader
-        title="Habits"
-        // description="Track habits solo — prayers, gym, studying, or anything you want to build. Tap a day to mark it done, or fill in past days."
-      />
-      <Suspense fallback={<CardGridSkeleton className="mt-6" cards={4} columns={2} />}>
+      <Suspense fallback={<CardGridSkeleton className="mt-8" cards={4} columns={2} />}>
         <HabitsData />
       </Suspense>
     </div>

@@ -78,7 +78,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <SidebarProvider>
           <AppSidebar enabledModules={enabledModules} />
           <main className="flex w-full flex-1 flex-col">
-            <MobileTopHeader avatarUrl={avatarUrl} email={email} />
+            <MobileTopHeader
+              avatarUrl={avatarUrl}
+              email={email}
+              username={profile.username}
+            />
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col pb-24 md:pb-0">
               {children}
             </div>

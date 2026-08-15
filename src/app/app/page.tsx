@@ -181,8 +181,11 @@ async function TasksWidgetData() {
 async function ActivityYearCard() {
   const { points, from, to } = await getMyActivityHeatmap();
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5">
-      <div className="flex items-baseline justify-between">
+    // No card wrapper — the heatmap itself is the visual, and boxing it
+    // inside another rounded card was reading as "chart in a jail cell"
+    // per user feedback. Just the label + chart, edge-to-edge.
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between px-1">
         <span className="text-xs font-bold uppercase tracking-wide text-body-muted">
           Your year, all activity
         </span>
