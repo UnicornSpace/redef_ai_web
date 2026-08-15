@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOutIcon, SettingsIcon } from "lucide-react";
+import { LogOutIcon, SettingsIcon, UserIcon } from "lucide-react";
 import type React from "react";
 import { createClient } from "@/lib/client";
 import {
@@ -22,9 +22,14 @@ import {
 export function MobileTopHeader({
   email,
   avatarUrl,
+  username,
 }: {
   email?: string;
   avatarUrl?: string;
+  /** Passed from /app/layout.tsx (profile.username). Enables the
+      "View public profile" link. Omitted only in the impossible-in-
+      -practice case where the layout couldn't resolve the profile. */
+  username?: string;
 }): React.ReactElement {
   const router = useRouter();
   const label = email ?? "Account";
@@ -78,6 +83,22 @@ export function MobileTopHeader({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {username ? (
+            <DropdownMenuItem asChild>
+              <Link
+                className="flex items-center gap-2"
+                href={`/u/${username}`}
+              >
+                <UserIcon />
+                <span className="flex flex-col">
+                  <span>View public profile</span>
+                  <span className="text-[10px] text-body-muted">
+                    /u/{username}
+                  </span>
+                </span>
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem asChild>
             <Link className="flex items-center gap-2" href="/app/profile/account">
               <SettingsIcon />

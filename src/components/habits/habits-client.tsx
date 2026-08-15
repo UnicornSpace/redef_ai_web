@@ -1719,17 +1719,23 @@ export function HabitsClient({
   }
 
   function handleToggleHabitFromFocus(habit: HabitListItem) {
-    const todayKey = todayDateKey();
+    handleToggleHabitOnDateFromFocus(habit, todayDateKey());
+  }
+
+  function handleToggleHabitOnDateFromFocus(
+    habit: HabitListItem,
+    dateKey: string,
+  ) {
     const currentDates = habit.completed_dates ?? [];
-    const nextDates = currentDates.includes(todayKey)
-      ? currentDates.filter((x) => x !== todayKey)
-      : [...currentDates, todayKey];
+    const nextDates = currentDates.includes(dateKey)
+      ? currentDates.filter((x) => x !== dateKey)
+      : [...currentDates, dateKey];
     handleUpdated(habit.id, { completed_dates: nextDates });
 
     startTransition(async () => {
       const res = habit.isCollaboration
-        ? await toggleCollaboratorDate(habit.id, todayKey)
-        : await toggleHabitDate(habit.id, todayKey);
+        ? await toggleCollaboratorDate(habit.id, dateKey)
+        : await toggleHabitDate(habit.id, dateKey);
       if (res.error) {
         handleUpdated(habit.id, { completed_dates: currentDates });
         toast.error(res.error);
@@ -1776,30 +1782,38 @@ export function HabitsClient({
     });
   }
 
-  function handleLogNumberFromFocus(habitId: string, value: number) {
+  function handleLogNumberFromFocus(
+    habitId: string,
+    dateKey: string,
+    value: number,
+  ) {
     const todayKey = todayDateKey();
+    const isToday = dateKey === todayKey;
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return;
     const previousValue = habit.todayNumericValue ?? null;
     const previousDates = habit.completed_dates ?? [];
-    handleUpdated(habitId, { todayNumericValue: value });
+    // todayNumericValue only ever represents "today" in the client state
+    // shape — logging a past date doesn't touch it, since there's no
+    // per-past-date field to update it into.
+    if (isToday) handleUpdated(habitId, { todayNumericValue: value });
 
     startTransition(async () => {
-      const res = await logNumericValue(habitId, todayKey, value);
+      const res = await logNumericValue(habitId, dateKey, value);
       if (res.error) {
-        handleUpdated(habitId, { todayNumericValue: previousValue });
+        if (isToday) handleUpdated(habitId, { todayNumericValue: previousValue });
         toast.error(res.error);
         return;
       }
       if (res.dayComplete !== undefined) {
-        const hasToday = previousDates.includes(todayKey);
-        if (res.dayComplete && !hasToday) {
+        const hasDate = previousDates.includes(dateKey);
+        if (res.dayComplete && !hasDate) {
           handleUpdated(habitId, {
-            completed_dates: [...previousDates, todayKey],
+            completed_dates: [...previousDates, dateKey],
           });
-        } else if (!res.dayComplete && hasToday) {
+        } else if (!res.dayComplete && hasDate) {
           handleUpdated(habitId, {
-            completed_dates: previousDates.filter((d) => d !== todayKey),
+            completed_dates: previousDates.filter((d) => d !== dateKey),
           });
         }
       }
@@ -1812,10 +1826,48 @@ export function HabitsClient({
   );
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-16 md:px-8 mt-6">
+    <div className="flex w-full flex-col">
+      {/* Inline page header — replaces the server PageHeader so the
+          Focus/Cards toggle can sit RIGHT NEXT to the "Habits" title on
+          mobile instead of stealing its own row below (~40px reclaimed on
+          every phone screen). Title alignment/typography match the
+          server PageHeader so no other page looks off. */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-8 pb-2 md:px-8">
+        <h1 className="text-balance text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
+          Habits
+        </h1>
+        <div className="flex items-center gap-1.5 md:hidden">
+          <button
+            type="button"
+            onClick={() => setLayoutMode("focus")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+              layoutMode === "focus"
+                ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
+                : "border-line bg-white text-body-muted",
+            )}
+          >
+            Focus
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode("cards")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+              layoutMode === "cards"
+                ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
+                : "border-line bg-white text-body-muted",
+            )}
+          >
+            Cards
+          </button>
+        </div>
+      </div>
+
+    <div className="flex flex-col gap-4 px-4 pb-16 md:px-8 mt-4">
       {/* Desktop / tablet — full row with both toggles + Add habit
-          button. Hidden on mobile (< md) where the button is replaced by
-          the FAB and the tabs move inline just above the habits list. */}
+          button. Hidden on mobile (< md) where Focus/Cards moved into
+          the header above and the Add button is replaced by the FAB. */}
       <div className="hidden md:flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Tabs
@@ -2035,65 +2087,37 @@ export function HabitsClient({
         </ResponsiveDialog>
       </div>
 
-      {/* Mobile-only compact pill row — hides the full TabsList (which
-          eats an extra ~40px of vertical space) and inlines the Focus /
-          Cards toggle immediately above the habits list. Weekly/Monthly
-          only relevant to Cards; hidden here to keep the strip minimal. */}
-      <div className="flex items-center gap-2 md:hidden">
-        <button
-          type="button"
-          onClick={() => setLayoutMode("focus")}
-          className={cn(
-            "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-            layoutMode === "focus"
-              ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
-              : "border-line bg-white text-body-muted",
-          )}
-        >
-          Focus
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayoutMode("cards")}
-          className={cn(
-            "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-            layoutMode === "cards"
-              ? "border-rf-green-deep bg-g-green-pale text-rf-green-deep"
-              : "border-line bg-white text-body-muted",
-          )}
-        >
-          Cards
-        </button>
-        {layoutMode === "cards" ? (
-          <>
-            <span aria-hidden className="h-4 w-px bg-line" />
-            <button
-              type="button"
-              onClick={() => setViewMode("weekly")}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                viewMode === "weekly"
-                  ? "border-body-muted bg-line/40 text-ink"
-                  : "border-line bg-white text-body-muted",
-              )}
-            >
-              Weekly
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("monthly")}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                viewMode === "monthly"
-                  ? "border-body-muted bg-line/40 text-ink"
-                  : "border-line bg-white text-body-muted",
-              )}
-            >
-              Monthly
-            </button>
-          </>
-        ) : null}
-      </div>
+      {/* Mobile-only Weekly/Monthly chips — only visible when Cards
+          layout is active. Focus/Cards toggle itself now lives inline
+          with the "Habits" title in the header row above. */}
+      {layoutMode === "cards" ? (
+        <div className="flex items-center gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={() => setViewMode("weekly")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+              viewMode === "weekly"
+                ? "border-body-muted bg-line/40 text-ink"
+                : "border-line bg-white text-body-muted",
+            )}
+          >
+            Weekly
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("monthly")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+              viewMode === "monthly"
+                ? "border-body-muted bg-line/40 text-ink"
+                : "border-line bg-white text-body-muted",
+            )}
+          >
+            Monthly
+          </button>
+        </div>
+      ) : null}
 
       {habits.length === 0 ? (
         <Empty>
@@ -2111,6 +2135,7 @@ export function HabitsClient({
         <FocusView
           habits={habits}
           onToggleHabit={handleToggleHabitFromFocus}
+          onToggleHabitOnDate={handleToggleHabitOnDateFromFocus}
           onToggleChecklistItem={handleToggleChecklistItemFromFocus}
           onLogNumber={handleLogNumberFromFocus}
         />
@@ -2139,6 +2164,7 @@ export function HabitsClient({
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }

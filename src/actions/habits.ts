@@ -635,6 +635,45 @@ export async function logNumericValue(
   return { dayComplete };
 }
 
+/**
+ * Fetch the logged numeric value + checked sub-items for a single past
+ * date. `listHabits` only returns "today's" state (todayNumericValue /
+ * todayCompletedItemIds) since preloading every historical date would be
+ * wasteful — this fills the gap when the Focus view's date strip is
+ * pointed at an earlier day and needs to pre-seed the number dialog or
+ * show which sub-items were checked that day.
+ */
+export async function getHabitCompletionForDate(
+  habitId: string,
+  date: string,
+): Promise<{
+  error?: string;
+  numericValue: number | null;
+  completedItemIds: string[];
+}> {
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) {
+    return { error: "Not signed in", numericValue: null, completedItemIds: [] };
+  }
+
+  const { data, error } = await supabase
+    .from("habit_completions")
+    .select("numeric_value, completed_item_ids")
+    .eq("habit_id", habitId)
+    .eq("user_id", user.user.id)
+    .eq("completion_date", date)
+    .maybeSingle();
+  if (error) {
+    return { error: error.message, numericValue: null, completedItemIds: [] };
+  }
+
+  return {
+    numericValue: data?.numeric_value ?? null,
+    completedItemIds: data?.completed_item_ids ?? [],
+  };
+}
+
 export async function toggleHabitDate(
   habitId: string,
   date: string,
