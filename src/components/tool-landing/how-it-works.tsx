@@ -1,5 +1,6 @@
 import { Download, ListChecks, SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
+import type { ToolConfig } from "@/lib/tools-config";
 
 type Step = {
   icon: typeof SlidersHorizontal;
@@ -187,7 +188,118 @@ function DownloadMock() {
   );
 }
 
-const steps: Step[] = [
+// ---- Weekly Goal Planner variants ------------------------------------------
+
+function GoalsMock() {
+  return (
+    <MockFrame>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {[
+          { label: "Ship the v2 launch", indent: 0 },
+          { label: "Final QA pass", indent: 1 },
+          { label: "Deep work — 20 hours", indent: 0 },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginLeft: item.indent * 16,
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid rgba(55,50,47,0.1)",
+            }}
+          >
+            <span
+              style={{
+                width: item.indent ? 8 : 10,
+                height: item.indent ? 8 : 10,
+                borderRadius: 3,
+                border: "1.5px solid var(--rf-green-deep)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}
+            >
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </MockFrame>
+  );
+}
+
+function WeeklyGridMock() {
+  return (
+    <MockFrame>
+      <div
+        style={{
+          border: "1px solid rgba(55,50,47,0.16)",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            background: "var(--paper)",
+            borderBottom: "1px solid rgba(55,50,47,0.2)",
+          }}
+        >
+          <span style={{ flex: 1.2 }} />
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((h) => (
+            <span
+              key={h}
+              style={{
+                flex: 1,
+                fontSize: 9,
+                fontWeight: 700,
+                textAlign: "center",
+                padding: "6px 2px",
+                color: "var(--ink)",
+              }}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+        {["Work Hours", ""].map((row) => (
+          <div
+            key={row || "blank"}
+            style={{
+              display: "flex",
+              borderTop: "1px solid rgba(55,50,47,0.08)",
+              height: 22,
+            }}
+          >
+            <span
+              style={{
+                flex: 1.2,
+                fontSize: 9,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: 6,
+                color: "var(--ink)",
+              }}
+            >
+              {row}
+            </span>
+            {Array.from({ length: 7 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static mock cells
+              <span key={i} style={{ flex: 1 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </MockFrame>
+  );
+}
+
+const habitTrackerSteps: Step[] = [
   {
     icon: SlidersHorizontal,
     title: "Configure your challenge",
@@ -210,6 +322,33 @@ const steps: Step[] = [
     description:
       "One click generates a print-ready PDF. Print it, pin it up, and fill it in by hand each day — no account, nothing saved.",
     points: ["Free, print-ready PDF", "No sign-up, nothing stored"],
+    Mock: DownloadMock,
+  },
+];
+
+const weeklyPlannerSteps: Step[] = [
+  {
+    icon: SlidersHorizontal,
+    title: "Add your goals",
+    description:
+      "Type your goals for the week, and break any of them into tasks — or subtasks — if you need to. Each one prints as a checkbox line.",
+    points: ["Goal → task → subtask checklist", "Name the weekly grid rows yourself"],
+    Mock: GoalsMock,
+  },
+  {
+    icon: ListChecks,
+    title: "See it update live",
+    description:
+      "The preview on the right updates as you type, so you know exactly what your one-page sheet will look like before you download it.",
+    points: ["Live A4-portrait preview", "Mon–Sat grid, your own row labels"],
+    Mock: WeeklyGridMock,
+  },
+  {
+    icon: Download,
+    title: "Download & print",
+    description:
+      "One click generates a print-ready PDF — or skip straight to a fully blank sheet. Print it, pin it up, and check things off by hand.",
+    points: ["Free, print-ready PDF", "Blank sheet option, no builder needed"],
     Mock: DownloadMock,
   },
 ];
@@ -301,7 +440,13 @@ function StepRow({ step, index }: { step: Step; index: number }) {
   );
 }
 
-export default function HowItWorksBlock() {
+export default function HowItWorksBlock({ tool }: { tool: ToolConfig }) {
+  const isWeeklyPlanner = tool.id === "weekly-goal-tracker";
+  const steps = isWeeklyPlanner ? weeklyPlannerSteps : habitTrackerSteps;
+  const heading = isWeeklyPlanner
+    ? "From blank page to a printed weekly planner in three steps"
+    : "From blank page to printed habit tracker in three steps";
+
   return (
     <section
       className="f-container"
@@ -320,7 +465,7 @@ export default function HowItWorksBlock() {
           How it works
         </span>
         <h2 className="f-h2" style={{ maxWidth: 640 }}>
-          From blank page to printed habit tracker in three steps
+          {heading}
         </h2>
         <p className="f-lede" style={{ maxWidth: 560 }}>
           No account, no setup — configure your sheet, watch it update live,

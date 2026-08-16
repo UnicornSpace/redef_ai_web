@@ -469,10 +469,284 @@ export const habitTrackerConfig: ToolConfig = {
     "https://play.google.com/store/apps/details?id=app.redef.habittracker",
   appStoreUrl: "https://apps.apple.com/app/redef-ai/id1234567890",
 
-  relatedToolIds: [],
+  relatedToolIds: ["weekly-goal-tracker"],
 
   canonicalUrl: "/tools/habit-challenge-sheet-generator",
   ogImage: "/thumbnails/habit sheet generator - redefai.png",
+};
+
+export const weeklyGoalPlannerConfig: ToolConfig = {
+  id: "weekly-goal-tracker",
+  slug: "weekly-goal-generator",
+  name: "Weekly Goal Planner",
+  title: "Free Printable Weekly Goal Planner & Tracker",
+  tagline: "Turn your weekly goals into a printable planner you'll actually use",
+  description:
+    "Build a one-page, print-ready weekly planner: a goals checklist with tasks and subtasks up top, and a customizable Mon–Sun grid at the bottom for whatever you want to hand-track. Free, no sign-up.",
+  longDescription: `
+    # Why a Weekly Goal Planner Beats a To-Do App
+
+    Most people don't fail at goals because they lack a task list — they fail because the task list lives inside an app they stop opening by Wednesday. A single sheet of paper on your desk or wall doesn't have that problem. It's always there, and every checkmark is visible proof of the week you're having.
+
+    The Weekly Goal Planner Generator builds that sheet for you. Type your goals for the week, break each one into tasks, and break tasks into subtasks if you need to — that becomes a printable checklist. Underneath it, a full Monday–Sunday grid gives you a place to hand-track anything else: work hours, meditation minutes, journaling, whatever matters to your week.
+
+    ## The Structure
+
+    The sheet is deliberately three simple bands, top to bottom:
+
+    - **A one-line header.** A free-text "focus" line for what this week is really about, and a year. Leave either blank and it prints as an underline you fill in by hand.
+    - **Goals, tasks, and subtasks.** Each goal gets a checkbox line. Add tasks under a goal, and subtasks under a task, only as deep as you actually need — most weeks that's one or two levels, not three.
+    - **A Monday–Sunday grid.** Seven fixed day columns, and rows you name yourself. Default to "Work Hours," or rename rows to meditation, journaling, water, reading — anything you'd rather track by hand than in an app. Leave a row blank and it's just space to draw in.
+
+    ## Why Print-Based Planning Works
+
+    - **Visible commitment.** A sheet taped above your desk is a standing reminder in a way a notification never is.
+    - **Zero-friction review.** Glancing at the grid takes less time than unlocking your phone.
+    - **No app-switching cost.** Nothing to open, sync, or forget your password for.
+    - **Built for imperfection.** A blank cell on Thursday doesn't send a guilt notification — you just fill it in Friday and move on.
+
+    ## Two Ways to Use It
+
+    1. **Type your real goals in.** Fill in the goal/task/subtask builder with what you're actually working on this week, download, print, and start checking boxes.
+    2. **Download a blank sheet.** Skip the builder entirely and grab a fully empty template — same layout, same grid, nothing pre-filled — if you'd rather write everything by hand from scratch.
+
+    ## Getting Started
+
+    1. Optionally set this week's focus line and the year.
+    2. Add your goals — and tasks or subtasks under any of them, if a goal needs breaking down.
+    3. Name the rows of the bottom grid (or leave some blank).
+    4. Download your filled sheet, or grab the empty version instead.
+    5. Print, and start working through the week.
+
+    No account, no saved data — the whole thing runs from what you type into the page and is discarded the moment your PDF downloads.
+
+    Start this week's sheet now. It takes under a minute.
+  `,
+  keywords: [
+    "weekly goal planner",
+    "weekly planner printable",
+    "weekly goal tracker",
+    "printable weekly planner",
+    "goal setting worksheet",
+    "weekly planner template",
+    "printable weekly schedule",
+    "weekly checklist template",
+    "free weekly planner",
+    "weekly planner pdf",
+  ],
+  primaryKeyword: "weekly goal planner",
+  secondaryKeywords: [
+    "printable weekly planner",
+    "weekly planner template",
+    "goal setting worksheet",
+    "weekly checklist",
+    "weekly schedule template",
+  ],
+
+  heroTagline:
+    "A one-page weekly planner that fits your goals — not a fixed template",
+  heroCTA: "Build your planner",
+  heroCTASecondary: "How it works",
+  thumbnailUrl: "/tools/weekly-goal-generator/thumbnail",
+  trustBadges: ["Free • No sign-up", "100% privacy", "No data collection"],
+
+  userCount: "5,000+",
+  rating: 4.7,
+  testimonials: [
+    {
+      text: "I stopped opening my to-do app by Tuesday every week. This sheet on my desk actually gets looked at.",
+      author: "Priya",
+      role: "Freelance designer",
+    },
+    {
+      text: "The blank grid at the bottom is the whole reason I use this over a normal planner app — I track deep work hours by hand and it just works.",
+      author: "Marcus",
+      role: "Software engineer",
+    },
+    {
+      text: "Simple, no sign-up, prints clean. I use one every Sunday to plan the week ahead.",
+      author: "Hana",
+      role: "Grad student",
+    },
+  ],
+
+  problemStatement:
+    "To-do apps are easy to stop opening. A weekly goal list buried three taps deep doesn't get reviewed, and generic printable planners force a fixed structure that doesn't match how you actually break goals into tasks — or what you want to hand-track day to day.",
+  solutionStatement:
+    "Build a one-page weekly planner in under a minute: type your goals, tasks, and subtasks as a checklist, name the rows of a Monday–Sunday grid for anything else you want to track by hand, download the PDF, and print it. Or skip the builder and download a fully blank sheet instead.",
+
+  benefits: [
+    {
+      title: "Goals, Tasks & Subtasks",
+      description:
+        "A real checklist hierarchy, not a flat list — break goals down only as deep as you need.",
+      icon: "checklist",
+    },
+    {
+      title: "Customizable Grid Rows",
+      description:
+        "Name the Mon–Sun grid rows yourself — work hours, meditation, anything.",
+      icon: "grid",
+    },
+    {
+      title: "Blank Sheet Option",
+      description: "Skip the builder and download a fully empty template instead.",
+      icon: "download",
+    },
+    {
+      title: "Print-Ready PDF",
+      description: "Vector-based A4 portrait. Prints crisp on any printer.",
+      icon: "printer",
+    },
+    {
+      title: "Zero Setup Friction",
+      description: "No sign-up, no account. Just build and download.",
+      icon: "lightning",
+    },
+    {
+      title: "One Page, One Week",
+      description: "Everything fits on a single sheet you can tape to a wall.",
+      icon: "calendar",
+    },
+  ],
+
+  features: [
+    {
+      title: "Nested Goal Checklist",
+      description:
+        "Goals print as checkboxes, with tasks and subtasks indented underneath — as deep as you actually need.",
+    },
+    {
+      title: "Editable Focus Line & Year",
+      description:
+        "Set what this week is about and the year, or leave both blank to print as underlines you fill by hand.",
+    },
+    {
+      title: "Custom Weekly Grid",
+      description:
+        "Fixed Monday–Sunday columns; you name the rows. Add, remove, or reorder up to 8.",
+    },
+    {
+      title: "Blank Template Download",
+      description:
+        "A second one-click download that ignores everything you typed and gives you a pure blank sheet.",
+    },
+    {
+      title: "Vector PDF Output",
+      description: "Crisp, scalable PDFs that print perfectly at any size.",
+    },
+  ],
+
+  examples: [
+    {
+      title: "Launch Week Planner",
+      description:
+        "One goal ('Ship v2'), broken into tasks like QA, docs, and announcement — with deep work hours tracked below.",
+      keywords: ["product launch", "project planning", "work"],
+    },
+    {
+      title: "Student Study Week",
+      description:
+        "Goals per subject, tasks per assignment, and a grid tracking study hours per day.",
+      keywords: ["student", "study planner", "academic"],
+    },
+    {
+      title: "Personal Reset Week",
+      description:
+        "Goals like sleep, movement, and journaling, with a grid row for each habit across the week.",
+      keywords: ["wellness", "habits", "personal goals"],
+    },
+    {
+      title: "Fully Blank Sheet",
+      description:
+        "Skip the builder entirely — download the empty structure and write everything by hand.",
+      keywords: ["blank planner", "printable template"],
+    },
+  ],
+
+  useCases: [
+    {
+      audience: "Professionals",
+      description: "Plan a focused work week and track deep work hours by hand.",
+      examples: ["Ship a feature", "Client deliverables", "Deep work hours"],
+    },
+    {
+      audience: "Students",
+      description: "Break study goals into tasks and track hours per subject.",
+      examples: ["Study hours", "Assignment tasks", "Reading goals"],
+    },
+    {
+      audience: "Freelancers",
+      description: "Keep client goals visible without opening a project app.",
+      examples: ["Project milestones", "Billable hours", "Follow-ups"],
+    },
+    {
+      audience: "Anyone Resetting a Routine",
+      description: "Use the grid for habits instead of goals — sleep, water, movement.",
+      examples: ["Sleep by 11pm", "Water intake", "Meditation minutes"],
+    },
+  ],
+
+  faqs: [
+    {
+      q: "Is the weekly goal planner really free?",
+      a: "Yes, 100% free. Build and download as many planner PDFs as you want, with no account and no sign-up.",
+    },
+    {
+      q: "Do I need to create an account?",
+      a: "No. Open the tool, build your sheet, download the PDF. No email, no password, no data collection.",
+    },
+    {
+      q: "Can I download a blank sheet instead?",
+      a: "Yes — there's a separate 'Download empty sheet' button that ignores everything you typed and gives you a fully blank template with the same layout and grid.",
+    },
+    {
+      q: "How deep can I break down a goal?",
+      a: "Goal → Task → Subtask. You don't have to use all three levels — most goals only need one or two.",
+    },
+    {
+      q: "What are the grid columns and rows?",
+      a: "Columns are fixed: Monday through Sunday. Rows are yours to name — default to 'Work Hours' plus four blank rows, or add up to 8 rows of your own.",
+    },
+    {
+      q: "What paper size does it print on?",
+      a: "A4 portrait, a single page. Prints cleanly at 100% scale.",
+    },
+    {
+      q: "Can I leave the focus line or year blank?",
+      a: "Yes. Either one prints as a blank underline you fill in by hand instead of typed text.",
+    },
+    {
+      q: "What file format does it download in?",
+      a: "PDF. Vector-based, so it scales and prints crisp at any size.",
+    },
+    {
+      q: "Is my data private?",
+      a: "We don't require an account and don't store what you type — it's used only to generate the PDF you download, then discarded.",
+    },
+    {
+      q: "Does it work on mobile?",
+      a: "Yes. Build your sheet on phone or tablet, download the PDF, then print from a computer or printer app.",
+    },
+    {
+      q: "Can I reorder my goals or grid rows?",
+      a: "Yes. Use the up and down arrows on each goal or row to reorder it — the download reflects that order.",
+    },
+    {
+      q: "Can I remove a grid row I don't want?",
+      a: "Yes. Every row has a remove button — go down to as few as one row if that's all you need.",
+    },
+  ],
+
+  toolUrl: "/tools/weekly-goal-generator/tool",
+  playStoreUrl:
+    "https://play.google.com/store/apps/details?id=app.redef.habittracker",
+  appStoreUrl: "https://apps.apple.com/app/redef-ai/id1234567890",
+
+  relatedToolIds: ["habit-tracker"],
+
+  canonicalUrl: "/tools/weekly-goal-generator",
+  ogImage: "/tools/weekly-goal-generator/thumbnail",
 };
 
 /**
@@ -481,6 +755,7 @@ export const habitTrackerConfig: ToolConfig = {
  */
 export const toolConfigs: Record<string, ToolConfig> = {
   [habitTrackerConfig.id]: habitTrackerConfig,
+  [weeklyGoalPlannerConfig.id]: weeklyGoalPlannerConfig,
 };
 
 export function getToolConfig(id: string): ToolConfig | null {

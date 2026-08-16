@@ -52,7 +52,7 @@ export function ToolLandingTemplate({
             <SocialProof tool={tool} />
             {/* 7. Features Grid */}
             {/* <FeaturesGrid tool={tool} /> */}
-            <HowItWorksBlock />
+            <HowItWorksBlock tool={tool} />
 
             {/* 3. Problem + Solution */}
             <ProblemSolution tool={tool} />

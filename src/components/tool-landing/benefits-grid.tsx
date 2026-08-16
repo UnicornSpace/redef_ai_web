@@ -8,6 +8,8 @@ import {
   Clock,
   Heart,
   Lightbulb,
+  ListChecks,
+  Download,
 } from "lucide-react";
 
 interface BenefitsGridProps {
@@ -29,6 +31,8 @@ const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart size={20} />,
   lightbulb: <Lightbulb size={20} />,
   printer: <Zap size={20} />,
+  checklist: <ListChecks size={20} />,
+  download: <Download size={20} />,
 };
 function FeatureCard({
   feature,

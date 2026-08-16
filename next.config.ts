@@ -28,10 +28,11 @@ const nextConfig: NextConfig = {
   // Keep react-pdf out of the bundler (it uses Node/native-ish deps).
   serverExternalPackages: ["@react-pdf/renderer"],
 
-  // Ensure the Inter font files are traced into the /api/generate-tracker
-  // serverless function (they're read from disk at render time).
+  // Ensure the Inter font files are traced into the PDF-generating
+  // serverless functions (they're read from disk at render time).
   outputFileTracingIncludes: {
     "/api/generate-tracker": ["./public/fonts/**"],
+    "/api/generate-weekly-goal-tracker": ["./public/fonts/**"],
   },
 
   async rewrites() {

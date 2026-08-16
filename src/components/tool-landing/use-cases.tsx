@@ -25,14 +25,13 @@ export function UseCases({ tool }: UseCasesProps) {
         <ContentRail maxWidth="max-w-6xl" className="space-y-10">
           <div className="max-w-2xl">
             <p className="font-medium text-primary text-xs uppercase tracking-[0.25em]">
-              Features
+              Who it's for
             </p>
             <h2 className="mt-3 text-balance font-medium text-2xl tracking-tight md:text-4xl">
-              Everything you need to run your product
+              {tool.tagline}
             </h2>
             <p className="mt-4 text-muted-foreground text-sm md:text-base">
-              One platform for planning, collaboration, and delivery — with room
-              to grow as your team scales.
+              {tool.problemStatement}
             </p>
           </div>
 
@@ -49,36 +48,39 @@ export function UseCases({ tool }: UseCasesProps) {
               <div className="relative flex h-full min-h-56 flex-col justify-between">
                 <div>
                   <div className="mb-4 flex size-10 items-center justify-center rounded-[var(--radius-md)] border bg-background/80 text-foreground/80">
-                    <HeadphonesIcon className="size-5" />
+                    <SparklesIcon className="size-5" />
                   </div>
                   <p className="font-medium text-primary text-xs uppercase tracking-[0.2em]">
-                    Customer support
+                    {tool.name}
                   </p>
                   <h3 className="mt-3 font-medium text-xl md:text-2xl">
-                    Help customers without the chaos
+                    {tool.heroTagline}
                   </h3>
                   <p className="mt-3 max-w-md text-muted-foreground text-sm leading-relaxed">
-                    Unified inbox, macros, and SLA tracking — so your team
-                    resolves issues faster and keeps customers happy.
+                    {tool.solutionStatement}
                   </p>
                 </div>
                 <div className="mt-8 grid grid-cols-1 gap-px bg-border min-[20rem]:grid-cols-3">
                   <div className="space-y-2 bg-background p-3">
-                    <p className="font-medium text-lg tracking-tight">4.9</p>
+                    <p className="font-medium text-lg tracking-tight">
+                      {tool.userCount ?? "Free"}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">
-                      CSAT score
+                      {tool.userCount ? "People using it" : "No sign-up"}
                     </p>
                   </div>
                   <div className="space-y-2 bg-background p-3">
-                    <p className="font-medium text-lg tracking-tight">12m</p>
+                    <p className="font-medium text-lg tracking-tight">
+                      {tool.rating ? `${tool.rating}★` : "$0"}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">
-                      Avg. response
+                      {tool.rating ? "Average rating" : "Forever"}
                     </p>
                   </div>
                   <div className="space-y-2 bg-background p-3">
-                    <p className="font-medium text-lg tracking-tight">98%</p>
+                    <p className="font-medium text-lg tracking-tight">100%</p>
                     <p className="text-[10px] text-muted-foreground">
-                      Resolved
+                      Print-ready
                     </p>
                   </div>
                 </div>
@@ -195,8 +197,8 @@ function FeatureCard({
 import type React from "react";
 import {
   BarChart3Icon,
-  HeadphonesIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   UsersIcon,
   ZapIcon,
 } from "lucide-react";
