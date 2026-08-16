@@ -5,6 +5,7 @@ import { CuelumeBind } from "@/components/cuelume-bind";
 import { ReferralCapture } from "@/components/referral-capture";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const interHeading = Inter({ subsets: ["latin"], variable: "--font-heading" });
 
@@ -100,6 +101,8 @@ export default function RootLayout({
         <ReferralCapture />
         <CuelumeBind />
         {children}
+        <GoogleAnalytics gaId="G-QYVV88TBCX" />
+
         <Toaster />
       </body>
     </html>

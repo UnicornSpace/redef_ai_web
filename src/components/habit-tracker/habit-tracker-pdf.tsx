@@ -8,15 +8,7 @@
  * user's habit config via computeLayout() — nothing here is habit-specific.
  */
 
-import path from "node:path";
-import {
-  Document,
-  Font,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-} from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
 import {
   CELL_PAD,
@@ -30,27 +22,7 @@ import {
   TITLE_H,
 } from "@/lib/habit-tracker/layout";
 import type { HabitConfig, TrackerConfig } from "@/lib/habit-tracker/types";
-
-// ---- Fonts -----------------------------------------------------------------
-// Registered once. Files live in /public/fonts and are traced into the
-// serverless function via next.config `outputFileTracingIncludes`.
-let fontsReady = false;
-function ensureFonts(): void {
-  if (fontsReady) return;
-  const dir = path.join(process.cwd(), "public", "fonts");
-  Font.register({
-    family: "Inter",
-    fonts: [
-      { src: path.join(dir, "Inter-Regular.woff"), fontWeight: "normal" },
-      { src: path.join(dir, "Inter-Medium.woff"), fontWeight: "medium" },
-      { src: path.join(dir, "Inter-SemiBold.woff"), fontWeight: "semibold" },
-      { src: path.join(dir, "Inter-Bold.woff"), fontWeight: "bold" },
-    ],
-  });
-  // Labels are short; never hyphenate-split them.
-  Font.registerHyphenationCallback((word) => [word]);
-  fontsReady = true;
-}
+import { ensurePdfFonts } from "@/lib/pdf/fonts";
 
 // ---- Styles ----------------------------------------------------------------
 const INK = "#1f2937";
@@ -274,7 +246,7 @@ function DayRow({
 // ---- Document --------------------------------------------------------------
 
 export function HabitTrackerDocument({ config }: { config: TrackerConfig }) {
-  ensureFonts();
+  ensurePdfFonts();
   const layout = computeLayout(config);
 
   return (
