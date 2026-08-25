@@ -15,7 +15,7 @@ import { FeaturesGrid } from "../components/new-landing-page-components/features
 import { RedefFooter } from "../components/new-landing-page-components/footer";
 import { Hero } from "../components/new-landing-page-components/hero";
 import { HomepageSchema } from "../components/new-landing-page-components/homepage-schema";
-import { RedefNav } from "../components/new-landing-page-components/nav";
+  import { RedefNav } from "../components/new-landing-page-components/nav";
 import { SecuritySection } from "../components/new-landing-page-components/security";
 import { Divider, MotionProvider } from "../components/new-landing-page-components/shared";
 import { Showcase } from "../components/new-landing-page-components/showcase";
