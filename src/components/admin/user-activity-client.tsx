@@ -14,6 +14,7 @@ import {
   initialsOf,
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -46,22 +47,50 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
 
   return (
     <div className="flex flex-col gap-6 px-4 pb-16 md:px-8">
-      <div className="flex flex-wrap gap-3 text-sm text-body-muted">
-        <span>Joined {formatDate(detail.joinedAt)}</span>
-        <span>·</span>
-        <span>Last active {formatDate(detail.lastActiveAt)}</span>
+      <div className="flex w-full max-w-2xl mx-auto flex-col items-center gap-6  p-8 text-center">
+        <Avatar className="size-24 text-3xl">
+          <AvatarImage
+            // alt={profile.displayName}
+            referrerPolicy="no-referrer"
+            // src={profile.avatarUrl ?? undefined}
+          />
+          <AvatarFallback className={cn("font-bold text-white")}>
+            {/* {initialsOf(profile.displayName)} */}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-extrabold text-ink">
+            {detail.displayName}
+          </h1>
+          <Link target="_blank" href={`https://redefai.app/u/${detail.username}`} className="text-sm text-accent-foreground">@{detail.username}</Link>
+          {/* {memberSinceLabel ? (
+            <p className="text-xs text-body-muted">
+              Member since {memberSinceLabel}
+            </p>
+          ) : null} */}
+        </div>
+
+        <div className="flex flex-wrap gap-3 text-sm text-body-muted">
+          <span>Joined {formatDate(detail.joinedAt)}</span>
+          <span>·</span>
+          <span>Last active {formatDate(detail.lastActiveAt)}</span>
+        </div>
       </div>
 
       <div>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-body-muted">
           Interactions ({totalInteractions.toLocaleString()} total, lifetime)
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
           <Stat label="Habits" value={detail.breakdown.habits} />
           <Stat label="Tasks" value={detail.breakdown.tasks} />
           <Stat label="Transactions" value={detail.breakdown.transactions} />
           <Stat label="Chats" value={detail.breakdown.chats} />
-          <Stat label="Deep work sessions" value={detail.breakdown.deepworkSessions} />
+          <Stat
+            label="Deep work hrs"
+            value={detail.breakdown.deepworkSessions}
+          />
           <Stat label="Goals" value={detail.breakdown.goals} />
         </div>
       </div>
@@ -71,8 +100,14 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
           AI Talk token usage (lifetime)
         </h2>
         <div className="grid grid-cols-3 gap-3">
-          <Stat label="Input tokens" value={detail.tokens.input.toLocaleString()} />
-          <Stat label="Output tokens" value={detail.tokens.output.toLocaleString()} />
+          <Stat
+            label="Input tokens"
+            value={detail.tokens.input.toLocaleString()}
+          />
+          <Stat
+            label="Output tokens"
+            value={detail.tokens.output.toLocaleString()}
+          />
           <Stat label="Total" value={detail.tokens.total.toLocaleString()} />
         </div>
       </div>
@@ -96,7 +131,8 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
         ) : (
           <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-paper">
             {detail.referrals.map((r) => {
-              const accentClass = AVATAR_ACCENT_BG_CLASSES[accentIndexFor(r.displayName)];
+              const accentClass =
+                AVATAR_ACCENT_BG_CLASSES[accentIndexFor(r.displayName)];
               const content = (
                 <>
                   {r.avatarUrl ? (
@@ -124,12 +160,17 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
                       {r.displayName}
                     </span>
                     <span className="truncate text-xs text-body-muted">
-                      {r.username ? `@${r.username}` : "Hasn't set up a profile yet"}
+                      {r.username
+                        ? `@${r.username}`
+                        : "Hasn't set up a profile yet"}
                       {r.joinedAt ? ` · joined ${formatDate(r.joinedAt)}` : ""}
                     </span>
                   </div>
                   {r.username ? (
-                    <ChevronRightIcon className="shrink-0 text-body-muted" size={16} />
+                    <ChevronRightIcon
+                      className="shrink-0 text-body-muted"
+                      size={16}
+                    />
                   ) : null}
                 </>
               );
@@ -142,7 +183,10 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
                   {content}
                 </Link>
               ) : (
-                <div key={r.userId} className="flex items-center gap-3 px-4 py-3 opacity-80">
+                <div
+                  key={r.userId}
+                  className="flex items-center gap-3 px-4 py-3 opacity-80"
+                >
                   {content}
                 </div>
               );

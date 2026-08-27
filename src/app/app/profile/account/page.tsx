@@ -2,6 +2,8 @@ import { ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 import { getMyReferrals, getUserPreferences } from "@/actions/chat";
 import { getMyProfile } from "@/actions/profile";
+import { getMyStandards } from "@/actions/standards";
+import type { UserStandards } from "@/lib/types/standards";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { LogoutButton } from "@/components/logout-button";
 import { DisplayNameForm } from "@/components/profile/display-name-form";
@@ -24,14 +26,26 @@ function summarizePreferences(
   return parts.length > 0 ? parts.join(" · ") : "Not set up yet";
 }
 
+function summarizeStandards(standards: UserStandards | null): string {
+  if (!standards) return "Not set up yet";
+  const parts: string[] = [];
+  if (standards.target_deep_work_hours != null) {
+    parts.push(`${standards.target_deep_work_hours}h target`);
+  }
+  if (standards.coaching_stance) parts.push(standards.coaching_stance);
+  return parts.length > 0 ? parts.join(" · ") : "Not set up yet";
+}
+
 const AccountPage = async () => {
   const supabase = await createClient();
-  const [{ data }, preferences, { referrals }, profile] = await Promise.all([
-    supabase.auth.getUser(),
-    getUserPreferences(),
-    getMyReferrals(),
-    getMyProfile(),
-  ]);
+  const [{ data }, preferences, { referrals }, profile, standards] =
+    await Promise.all([
+      supabase.auth.getUser(),
+      getUserPreferences(),
+      getMyReferrals(),
+      getMyProfile(),
+      getMyStandards(),
+    ]);
   const email = data.user?.email;
   const fullName = data.user?.user_metadata?.full_name as string | undefined;
   const avatarUrl = (data.user?.user_metadata?.avatar_url ??
@@ -167,6 +181,20 @@ const AccountPage = async () => {
             <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />
           </Link>
           <Link
+            href="/app/profile/standards"
+            className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-ink">
+                Work standards
+              </span>
+              <span className="text-xs text-body-muted">
+                {summarizeStandards(standards)}
+              </span>
+            </div>
+            <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />
+          </Link>
+          <Link
             href="/app/profile/preferences"
             className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 transition-colors hover:bg-muted/50"
           >
@@ -182,7 +210,7 @@ const AccountPage = async () => {
           </Link>
           <Link
             href="/app/profile/referral"
-            className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
+            className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 transition-colors hover:bg-muted/50"
           >
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-ink">
@@ -192,6 +220,21 @@ const AccountPage = async () => {
                 {referrals.length > 0
                   ? `${referrals.length} ${referrals.length === 1 ? "person" : "people"} invited`
                   : "Share your referral link"}
+              </span>
+            </div>
+            <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />
+          </Link>
+          {/* Internal reference — deliberately kept out of the sidebar and
+              tab bar, but reachable when you need to know what the app can
+              actually do. */}
+          <Link
+            href="/app/manual"
+            className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-ink">Manual</span>
+              <span className="text-xs text-body-muted">
+                Every feature and everything you can ask Talk to do
               </span>
             </div>
             <ChevronRightIcon className="shrink-0 text-body-muted" size={18} />

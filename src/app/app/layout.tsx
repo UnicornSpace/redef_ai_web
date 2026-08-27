@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { MobileFabProvider } from "@/components/app-shell/mobile-fab-context";
 import { MobileTabBar } from "@/components/app-shell/mobile-tab-bar";
 import { MobileTopHeader } from "@/components/app-shell/mobile-top-header";
+import { WeeklyReportPopup } from "@/components/app-shell/weekly-report-popup";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/modules";
 import { createClient } from "@/lib/server";
@@ -74,6 +75,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className={`redef redef-surface ${manrope.className}`}>
+      <WeeklyReportPopup />
       <MobileFabProvider>
         <SidebarProvider>
           <AppSidebar enabledModules={enabledModules} />

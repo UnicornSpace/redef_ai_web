@@ -1,6 +1,14 @@
 "use client";
 
-import { Calendar, House, MoreHorizontal, Plus, Timer, Trophy } from "lucide-react";
+import {
+  BarChart3,
+  Calendar,
+  House,
+  MoreHorizontal,
+  Plus,
+  Timer,
+  Trophy,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -56,6 +64,12 @@ const MORE_ITEMS = [
     label: "Deep Work",
     icon: Timer,
     moduleKey: "deep_work" as ModuleKey,
+  },
+  {
+    href: "/app/reports",
+    label: "Reports",
+    icon: BarChart3,
+    moduleKey: null,
   },
 ];
 

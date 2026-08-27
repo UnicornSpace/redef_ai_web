@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Timer, Trophy } from "lucide-react";
+import { BarChart3, Calendar, Timer, Trophy } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -70,6 +70,13 @@ const NAV_ITEMS = [
     href: "/app/challenges",
     label: "Challenges",
     icon: Trophy,
+    size: "size-5!",
+    moduleKey: null,
+  },
+  {
+    href: "/app/reports",
+    label: "Reports",
+    icon: BarChart3,
     size: "size-5!",
     moduleKey: null,
   },
