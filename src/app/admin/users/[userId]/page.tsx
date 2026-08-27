@@ -14,10 +14,10 @@ export default async function AdminUserDetailPage({
 
   return (
     <div className="flex w-full flex-col">
-      <PageHeader
+      {/* <PageHeader
         title={detail.displayName}
         description={detail.username ? `@${detail.username}` : (detail.email ?? undefined)}
-      />
+      /> */}
       <UserActivityClient detail={detail} />
     </div>
   );

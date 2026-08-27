@@ -8,6 +8,8 @@ import {
   Loader2Icon,
   MicIcon,
   PauseIcon,
+  PhoneIcon,
+  PhoneOffIcon,
   PlayIcon,
   RefreshCcwIcon,
   SquareIcon,
@@ -23,7 +25,10 @@ import {
   useState,
 } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
+import type { AgentState } from "@livekit/components-react";
+import { AgentAudioVisualizerAura } from "@/components/agent-audio-visualizer-aura";
 import { useLiveTranscription } from "@/hooks/use-live-transcription";
+import { useRealtimeVoice } from "@/hooks/use-realtime-voice";
 import { useTTSQueue } from "@/hooks/use-tts-queue";
 import { renderToolOutput } from "@/components/talk/tool-renderers";
 import { ToolTrace } from "@/components/talk/tool-trace";
@@ -33,6 +38,7 @@ import {
   FaCalendar,
   FaChartLine,
   FaCheckCircle,
+  FaMoon,
   FaTasks,
 } from "react-icons/fa";
 import { toast } from "sonner";
@@ -67,6 +73,7 @@ import { TextShimmer } from "../text-shimmer";
 import { AudioLinesIcon, AudioLinesIconHandle } from "../ui/audio-lines";
 
 const SUGGESTIONS = [
+  { icon: FaMoon, prompt: "Wind up my day" },
   { icon: FaTasks, prompt: "What are my tasks for today?" },
   { icon: FaCalendar, prompt: "What's on my calendar this week?" },
   { icon: FaChartLine, prompt: "Show me this week's progress" },
@@ -259,6 +266,21 @@ export function ChatPane({
     onFinal: (t) => setInput((prev) => (prev ? `${prev} ${t}` : t).trim()),
     onInterim: (t) => setInterimText(t),
   });
+  const realtimeVoice = useRealtimeVoice();
+  const isRealtimeActive =
+    realtimeVoice.status === "connecting" || realtimeVoice.status === "connected";
+  // Drives the aura visualizer's animation preset — the shader itself has
+  // no idea about our hook, it just reacts to one of these state names.
+  const auraState: AgentState =
+    realtimeVoice.status === "connecting"
+      ? "connecting"
+      : realtimeVoice.status === "error"
+        ? "failed"
+        : realtimeVoice.status === "idle"
+          ? "disconnected"
+          : realtimeVoice.isAssistantSpeaking
+            ? "speaking"
+            : "listening";
   // Per-message-id counter of how many chars of the assistant reply
   // we've already fed to the TTS queue, so streaming chunks don't get
   // re-spoken on each render.
@@ -462,6 +484,30 @@ export function ChatPane({
     (status === "streaming" &&
       lastMessage?.role === "assistant" &&
       !lastMessage.parts.some((p) => p.type === "text"));
+
+  // Surface realtime connection/tool-call errors the same way the rest of
+  // the pane reports problems — a toast, not a silent failure.
+  useEffect(() => {
+    if (realtimeVoice.error) toast.error(realtimeVoice.error);
+  }, [realtimeVoice.error]);
+
+  function handleRealtimeToggle() {
+    if (isRealtimeActive) {
+      playSound("release");
+      realtimeVoice.stop();
+      return;
+    }
+    // A live voice call and the type/record-then-send flow don't mix —
+    // stop whatever the mic or auto-speak is mid-doing before opening it.
+    if (isRecording) mediaRecorderRef.current?.stop();
+    if (liveTranscription.isListening) {
+      liveTranscription.stop();
+      setInterimText("");
+    }
+    stopSpeech();
+    playSound("press");
+    realtimeVoice.start();
+  }
 
   async function handleMicClick() {
     // Ignore taps while the previous recording is still being transcribed
@@ -739,6 +785,31 @@ export function ChatPane({
         )}
       >
         <div className="mx-auto mb-4 w-full  px-4">
+          {isRealtimeActive ? (
+            <div className="mb-2 flex flex-col items-center gap-2 rounded-xl border border-line bg-white/90 px-4 py-4 shadow-xl backdrop-blur">
+              <AgentAudioVisualizerAura
+                size="sm"
+                state={auraState}
+                volume={realtimeVoice.isAssistantSpeaking ? realtimeVoice.assistantVolume : 0}
+                color="#3e9a35"
+                themeMode="light"
+              />
+              <span className="text-sm font-medium text-ink">
+                {realtimeVoice.status === "connecting"
+                  ? "Connecting live call..."
+                  : realtimeVoice.isAssistantSpeaking
+                    ? "Redef is speaking..."
+                    : realtimeVoice.isUserSpeaking
+                      ? "Listening..."
+                      : "Live call connected — say something"}
+              </span>
+              {realtimeVoice.transcript.length > 0 ? (
+                <p className="line-clamp-2 text-center text-sm text-body-muted">
+                  {realtimeVoice.transcript.at(-1)?.text}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <PromptInput
             onSubmit={handleSubmit}
             // Force the InputGroup to be a rounded-box (not a pill) and
@@ -766,15 +837,25 @@ export function ChatPane({
                   }
                 }}
                 placeholder={
-                  isRecording
-                    ? "Listening..."
-                    : isTranscribing
-                      ? "Transcribing..."
-                      : liveTranscription.isListening
-                        ? "Speak now — words appear as you go..."
-                        : "Say something..."
+                  isRealtimeActive
+                    ? "Live call in progress — just talk..."
+                    : isRecording
+                      ? "Listening..."
+                      : isTranscribing
+                        ? "Transcribing..."
+                        : liveTranscription.isListening
+                          ? "Speak now — words appear as you go..."
+                          : "Say something..."
                 }
+                // `disabled` (not readOnly) for recording/transcribing is
+                // intentional and matches the InputGroup's built-in
+                // has-[textarea:disabled]:opacity-64 rule — a brief dim is
+                // the right cue there. For a whole voice call, that same
+                // rule made the entire input look transparent/broken for
+                // as long as the call ran. `readOnly` blocks typing
+                // without tripping that rule.
                 disabled={isRecording || isTranscribing}
+                readOnly={isRealtimeActive}
                 className="max-h-28 px-2 bg-primary/5 w-full overflow-y-auto py-1.5 text-base leading-normal"
               />
             </PromptInputBody>
@@ -799,6 +880,31 @@ export function ChatPane({
                 </PromptInputButton>
               </PromptInputTools>
               <PromptInputTools className="space-x-1">
+                {/* Live voice call (OpenAI Realtime API) — a genuine
+                    two-way audio conversation with the model, distinct
+                    from the mic button's record → transcribe → send loop.
+                    On the right, right before the mic, so the two voice
+                    affordances sit next to each other. */}
+                <PromptInputButton
+                  variant={isRealtimeActive ? "destructive" : "ghost"}
+                  onClick={handleRealtimeToggle}
+                  disabled={realtimeVoice.status === "connecting"}
+                  className="p-4!"
+                  aria-label={
+                    isRealtimeActive
+                      ? "End live voice call"
+                      : "Start a live voice call"
+                  }
+                  aria-pressed={isRealtimeActive}
+                >
+                  {realtimeVoice.status === "connecting" ? (
+                    <Loader2Icon className="size-5 animate-spin" />
+                  ) : isRealtimeActive ? (
+                    <PhoneOffIcon className="size-5" />
+                  ) : (
+                    <PhoneIcon className="size-5" />
+                  )}
+                </PromptInputButton>
                 {/* Mic button — while recording/listening, the AudioLines
                     icon's own wave animation (driven via ref above) is the
                     "listening" indicator, replacing the earlier ping-pulse
@@ -809,7 +915,7 @@ export function ChatPane({
                       ? "destructive"
                       : "ghost"
                   }
-                  disabled={isTranscribing}
+                  disabled={isTranscribing || isRealtimeActive}
                   // touch-manipulation disables the iOS double-tap-to-zoom
                   // delay, which otherwise makes the mic feel unresponsive
                   // (or outright unclickable if a nearby tap steals focus

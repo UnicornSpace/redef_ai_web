@@ -284,6 +284,10 @@ export async function updateUserPreferences(input: {
   occupation?: string | null;
   traits?: UserTraits;
   customInstructions?: string | null;
+  /** Only written when the key is present — omitting it preserves
+      whatever the assistant's updateMemory tool last stored, rather than
+      wiping it every time someone saves the rest of the form. */
+  memorySummary?: string | null;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: user, error: authError } = await supabase.auth.getUser();
@@ -295,6 +299,9 @@ export async function updateUserPreferences(input: {
     occupation: input.occupation ?? null,
     traits: input.traits ?? {},
     custom_instructions: input.customInstructions ?? null,
+    ...("memorySummary" in input
+      ? { memory_summary: input.memorySummary?.trim() || null }
+      : {}),
   });
   if (error) return { error: error.message };
 

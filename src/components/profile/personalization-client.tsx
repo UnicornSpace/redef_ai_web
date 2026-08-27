@@ -46,7 +46,9 @@ export function PersonalizationClient({
   const [customInstructions, setCustomInstructions] = useState(
     initialPreferences?.custom_instructions ?? "",
   );
-  const memorySummary = initialPreferences?.memory_summary ?? "";
+  const [memorySummary, setMemorySummary] = useState(
+    initialPreferences?.memory_summary ?? "",
+  );
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -56,6 +58,7 @@ export function PersonalizationClient({
         occupation: occupation.trim() || null,
         traits: { enthusiasm, verbosity, useImages },
         customInstructions: customInstructions.trim() || null,
+        memorySummary: memorySummary.trim() || null,
       });
       if (res.error) {
         toast.error(res.error);
@@ -164,12 +167,13 @@ export function PersonalizationClient({
         </h2>
         <p className="text-xs text-body-muted">
           A running summary of what Redef has picked up about you across
-          conversations. You can edit or clear it any time.
+          conversations. You can edit or clear it any time — if it&apos;s
+          wrong, correcting it here changes what Redef believes.
         </p>
         <Textarea
-          value={memorySummary || "Nothing remembered yet."}
-          readOnly
-          disabled
+          value={memorySummary}
+          onChange={(e) => setMemorySummary(e.target.value)}
+          placeholder="Nothing remembered yet."
         />
       </div>
 
