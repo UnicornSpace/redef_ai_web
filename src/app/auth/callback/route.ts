@@ -52,8 +52,20 @@ export async function GET(request: Request) {
     if (existing.user) {
       return NextResponse.redirect(`${origin}${next}`)
     }
+
+    // This used to redirect to /auth/error with no query string at all, so
+    // the error page always showed "An unspecified error occurred" no
+    // matter what actually went wrong — completely useless for figuring
+    // out why a sign-in failed. Passing the real Supabase error message
+    // through is what makes that page tell you anything at all.
+    return NextResponse.redirect(
+      `${origin}/auth/error?error=${encodeURIComponent(error.message)}`,
+    )
   }
 
-  // Return the user to an error page if the exchange fails
-  return NextResponse.redirect(`${origin}/auth/error`)
+  // Reached with no "code" param at all — e.g. someone hit this URL
+  // directly, or the provider redirected without one.
+  return NextResponse.redirect(
+    `${origin}/auth/error?error=${encodeURIComponent('No sign-in code was returned. Try signing in again.')}`,
+  )
 }
