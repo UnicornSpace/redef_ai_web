@@ -32,7 +32,7 @@
   --card-foreground: var(--color-ink);
   --popover: #ffffff;
   --popover-foreground: var(--color-ink);
-  --primary: var(--color-ink);
+  --primary: var(--color-rf-green-deep);
   --primary-foreground: #ffffff;
   --secondary: #f3f0ea;
   --secondary-foreground: var(--color-ink);
@@ -52,7 +52,7 @@
   --chart-5: var(--color-rf-green);
   --sidebar: var(--color-paper);
   --sidebar-foreground: var(--color-ink);
-  --sidebar-primary: var(--color-ink);
+  --sidebar-primary: var(--color-rf-green-deep);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--color-g-green-pale);
   --sidebar-accent-foreground: var(--color-rf-green-deep);

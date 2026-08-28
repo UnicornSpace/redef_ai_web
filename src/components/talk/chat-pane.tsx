@@ -268,7 +268,8 @@ export function ChatPane({
   });
   const realtimeVoice = useRealtimeVoice();
   const isRealtimeActive =
-    realtimeVoice.status === "connecting" || realtimeVoice.status === "connected";
+    realtimeVoice.status === "connecting" ||
+    realtimeVoice.status === "connected";
   // Drives the aura visualizer's animation preset — the shader itself has
   // no idea about our hook, it just reacts to one of these state names.
   const auraState: AgentState =
@@ -638,7 +639,7 @@ export function ChatPane({
   return (
     <div className="flex w-full flex-col pt-8  md:pb-28 md:pt-16">
       {messages.length === 0 ? (
-        <p className="mx-auto mt-16 mb-8 text-center text-3xl font-extrabold text-ink md:mt-24 md:text-5xl">
+        <p className="mx-auto mt-16 mb-8 text-center text-3xl font-bold text-ink md:mt-24 md:text-3xl">
           {greeting}
         </p>
       ) : null}
@@ -790,19 +791,31 @@ export function ChatPane({
               <AgentAudioVisualizerAura
                 size="sm"
                 state={auraState}
-                volume={realtimeVoice.isAssistantSpeaking ? realtimeVoice.assistantVolume : 0}
+                volume={
+                  realtimeVoice.isAssistantSpeaking
+                    ? realtimeVoice.assistantVolume
+                    : 0
+                }
                 color="#3e9a35"
                 themeMode="light"
               />
-              <span className="text-sm font-medium text-ink">
-                {realtimeVoice.status === "connecting"
-                  ? "Connecting live call..."
-                  : realtimeVoice.isAssistantSpeaking
+              {realtimeVoice.status === "connecting" ? (
+                <TextShimmer
+                  key={realtimeVoice.connectingMessage}
+                  className="text-sm font-medium"
+                  duration={1.3}
+                >
+                  {realtimeVoice.connectingMessage}
+                </TextShimmer>
+              ) : (
+                <span className="text-sm font-medium text-ink">
+                  {realtimeVoice.isAssistantSpeaking
                     ? "Redef is speaking..."
                     : realtimeVoice.isUserSpeaking
                       ? "Listening..."
                       : "Live call connected — say something"}
-              </span>
+                </span>
+              )}
               {realtimeVoice.transcript.length > 0 ? (
                 <p className="line-clamp-2 text-center text-sm text-body-muted">
                   {realtimeVoice.transcript.at(-1)?.text}
@@ -888,12 +901,18 @@ export function ChatPane({
                 <PromptInputButton
                   variant={isRealtimeActive ? "destructive" : "ghost"}
                   onClick={handleRealtimeToggle}
-                  disabled={realtimeVoice.status === "connecting"}
+                  // Deliberately NOT disabled while connecting. It used to
+                  // be, which meant a connection that stalled left the user
+                  // with a spinning, unclickable button and no way to back
+                  // out short of reloading the page. Connecting is exactly
+                  // when someone most wants to be able to cancel.
                   className="p-4!"
                   aria-label={
-                    isRealtimeActive
-                      ? "End live voice call"
-                      : "Start a live voice call"
+                    realtimeVoice.status === "connecting"
+                      ? "Cancel connecting"
+                      : isRealtimeActive
+                        ? "End live voice call"
+                        : "Start a live voice call"
                   }
                   aria-pressed={isRealtimeActive}
                 >
@@ -995,14 +1014,14 @@ export function ChatPane({
         </div>
         {messages.length === 0 ? (
           <Suggestions className="mx-auto w-[90%] flex-wrap items-center justify-center md:max-w-2xl">
-            {SUGGESTIONS.map((s) => (
+            {SUGGESTIONS.map((s, i) => (
               <Suggestion
                 key={s.prompt}
                 onClick={(text) => setInput(text)}
                 suggestion={s.prompt}
                 className="bg-white/60"
               >
-                <s.icon className="mr-1 text-rf-green-deep" />
+                <s.icon className={cn("mr-1 ", i % 2 === 0 ? "text-rf-" : "text-rf-blue")} />
                 {s.prompt}
               </Suggestion>
             ))}

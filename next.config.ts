@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   // interactivity (buttons, drawers, etc.) on that device while dev mode is
   // otherwise serving pages fine. Update this IP if your machine's LAN
   // address changes.
-  allowedDevOrigins: ["192.168.31.47","192.168.43.222"],
+  allowedDevOrigins: ["192.168.31.47","192.168.43.222","192.168.160.222"],
 
   // Next.js 16 defaults images.qualities to [75] — preserve the quality
   // values actually used across the app (related-tools, hero-section, tools

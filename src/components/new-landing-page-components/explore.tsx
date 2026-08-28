@@ -87,7 +87,7 @@ const commandRows: CommandRow[] = [
   {
     label: "Schedule",
     desc: "“Move my standup to after lunch.”",
-    color: "var(--rf-sky)",
+    color: "var(--rf-coral)",
     highlight: true,
     icon: (
       <svg

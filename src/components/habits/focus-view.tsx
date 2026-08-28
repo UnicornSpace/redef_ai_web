@@ -894,11 +894,11 @@ export function FocusView({
             older dates); today anchors the right edge. Scrollbar hidden
             via arbitrary variants — cross-browser via
             `scrollbar-none` polyfill classes below. */}
-        <div className="lg:hidden">
+        <div className="lg:hidden ">--
           <div
             ref={stripRef}
             className={cn(
-              "flex snap-x snap-mandatory items-start gap-2 overflow-x-auto pb-1",
+              "flex snap-x snap-mandatory  items-start gap-2 overflow-x-auto pb-1",
               // Kill scrollbars in all engines. `[-ms-overflow-style:none]`
               // + `[scrollbar-width:none]` covers Firefox/IE; the
               // ::-webkit selector covers Chromium/WebKit.

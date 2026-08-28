@@ -11,7 +11,7 @@
   --background: #fdfcfa;
   --foreground: #2b2620;
   --card: #ffffff;
-  --primary: #37322f;
+  --primary: #3e9a35;
   --primary-foreground: #ffffff;
   --secondary: #f3f0ea;
   --secondary-foreground: #37322f;
@@ -20,7 +20,13 @@
   --radius: 1rem;
   --radius-pill: 32px;
 
-  /* ---- Redef color identity ---- */
+  /* ---- Redef color identity ----
+     family.co-style palette: white surface, four accents used deliberately
+     (green, violet, amber, coral — see avatar.ts's AVATAR_ACCENT_*).
+     --rf-sky exists only for functional multi-color contexts that need a
+     5th hue to disambiguate many items (calendar category picker) — don't
+     draw from it on marketing/brand surfaces, that's what dilutes the four
+     accents into an uncurated six. */
   --rf-green: #59b74f;
   --rf-green-deep: #3e9a35;
   --rf-violet: #8b5cf6;
@@ -56,7 +62,7 @@
      instead of hardcoded hex) ---- */
   --sidebar: var(--paper);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--ink);
+  --sidebar-primary: var(--rf-green-deep);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--g-green-pale);
   --sidebar-accent-foreground: var(--rf-green-deep);
@@ -181,7 +187,7 @@
   background: linear-gradient(
     92deg,
     var(--rf-green) 0%,
-    var(--rf-sky) 28%,
+    var(--rf-coral) 28%,
     var(--rf-violet) 55%,
     var(--rf-amber) 80%,
     var(--rf-green) 100%

@@ -102,7 +102,7 @@ export function Showcase() {
           <ShowcaseColumn
             image="/images/calendar.png"
             alt="Redef AI calendar view"
-            color="var(--rf-sky)"
+            color="var(--rf-coral)"
             label="Calendar"
             icon={
               <svg

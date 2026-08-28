@@ -48,6 +48,74 @@ interface RealtimeEvent {
 // (verified directly against the API, not inferred).
 const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
+// `new RTCPeerConnection()` with no config offers only host candidates —
+// the device's own LAN address. That's often enough on a desktop with a
+// routable path out, but behind carrier-grade NAT (i.e. any phone on
+// mobile data) there's nothing for the far end to answer to, so ICE never
+// completes and the call hangs in "connecting" forever. STUN lets the
+// browser discover its own public address and offer a reachable
+// (server-reflexive) candidate instead.
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ],
+};
+
+// Hard ceiling on the whole connect sequence. Without this the UI had no
+// failure path at all: if ICE never completed, the spinner just span
+// indefinitely with no error, no timeout, and no way back except a reload.
+const CONNECT_TIMEOUT_MS = 30_000;
+
+// Rotating reassurance copy shown (with a text-shimmer) while the call is
+// connecting — a single static "Connecting..." label gives no sense that
+// anything is still happening on a handshake that can legitimately take a
+// few seconds. Swaps to a distinct, more apologetic pool once it's run
+// long enough that a still-static message would start to read as stuck.
+const CONNECTING_MESSAGES = ["Connecting...", "Just a moment...", "Almost there..."];
+const CONNECTING_MESSAGES_SLOW = [
+  "Still working on it...",
+  "Taking a little longer than usual...",
+  "Hang tight, almost there...",
+];
+const SLOW_MESSAGE_THRESHOLD_MS = 6_000;
+const MESSAGE_ROTATE_INTERVAL_MS = 3_200;
+
+// A soft repeating tick while connecting — the audio equivalent of the
+// rotating text, so a silent phone (no visual attention on the tab) still
+// gets a "still alive" cue. Deliberately the quietest, shortest recipe in
+// the palette (not `loading` again) so a 1.8s repeat doesn't turn into an
+// alarm.
+const CONNECT_TICK_INTERVAL_MS = 1_800;
+
+/**
+ * getUserMedia rejects with terse, standardized error names that mean
+ * nothing to a user — "Could not start audio source" (NotReadableError) is
+ * the one that actually shipped and confused people. Translate to
+ * something with a next action in it.
+ */
+function micErrorMessage(err: unknown): string {
+  const name = err instanceof DOMException ? err.name : "";
+  switch (name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "Microphone access is blocked. Allow it for this site in your browser settings, then try again.";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "No microphone found. Connect one and try again.";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "Your microphone is already in use by another app or tab. Close it (Zoom, Meet, another call) and try again.";
+    case "OverconstrainedError":
+      return "Your microphone doesn't support the required settings.";
+    case "SecurityError":
+      return "Microphone access needs a secure (HTTPS) connection.";
+    default:
+      return err instanceof Error && err.message
+        ? `Couldn't access your microphone: ${err.message}`
+        : "Couldn't access your microphone.";
+  }
+}
+
 export function useRealtimeVoice() {
   const [status, setStatus] = useState<RealtimeStatus>("idle");
   // Mirrors `status` for callbacks that need the current value without
@@ -66,11 +134,19 @@ export function useRealtimeVoice() {
   const [assistantVolume, setAssistantVolume] = useState(0);
   const [transcript, setTranscript] = useState<RealtimeTranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [connectingMessage, setConnectingMessage] = useState<string>(
+    CONNECTING_MESSAGES[0],
+  );
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- assistant volume analysis ------------------------------------------
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -154,7 +230,21 @@ export function useRealtimeVoice() {
   >([]);
   const activeResponseRef = useRef(false);
 
+  // Stops the rotating-message and repeating-tick feedback that only makes
+  // sense while actively connecting. Called both on success (`dc.onopen`,
+  // which doesn't otherwise call `cleanup()`) and on every failure/cancel
+  // path via `cleanup()` below.
+  const stopConnectFeedback = useCallback(() => {
+    if (messageIntervalRef.current) clearInterval(messageIntervalRef.current);
+    messageIntervalRef.current = null;
+    if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    tickIntervalRef.current = null;
+  }, []);
+
   const cleanup = useCallback(() => {
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = null;
+    stopConnectFeedback();
     dcRef.current?.close();
     dcRef.current = null;
     pcRef.current?.close();
@@ -171,7 +261,7 @@ export function useRealtimeVoice() {
     activeResponseRef.current = false;
     setIsUserSpeaking(false);
     setIsAssistantSpeaking(false);
-  }, [stopVolumeLoop]);
+  }, [stopVolumeLoop, stopConnectFeedback]);
 
   const stop = useCallback(() => {
     // A hangup only gets its own "call ended" tone if a call was actually
@@ -306,7 +396,51 @@ export function useRealtimeVoice() {
     playSound("loading");
     setTranscript([]);
 
+    // Rotating "still working on it" copy + a soft repeating tick — both
+    // stopped by stopConnectFeedback() the moment the call either connects
+    // (dc.onopen) or fails/gets cancelled (cleanup()).
+    const connectStartedAt = Date.now();
+    let messageIndex = 0;
+    setConnectingMessage(CONNECTING_MESSAGES[0]);
+    messageIntervalRef.current = setInterval(() => {
+      const pool =
+        Date.now() - connectStartedAt >= SLOW_MESSAGE_THRESHOLD_MS
+          ? CONNECTING_MESSAGES_SLOW
+          : CONNECTING_MESSAGES;
+      messageIndex = (messageIndex + 1) % pool.length;
+      setConnectingMessage(pool[messageIndex]);
+    }, MESSAGE_ROTATE_INTERVAL_MS);
+    tickIntervalRef.current = setInterval(() => {
+      playSound("tick");
+    }, CONNECT_TICK_INTERVAL_MS);
+
+    // Whatever else goes wrong below, the UI must never be left spinning
+    // forever. Previously there was no failure path at all for a stalled
+    // WebRTC connection — no timeout, no ICE-failure handler — so a phone
+    // that couldn't complete ICE just sat on "Connecting live call…"
+    // indefinitely with no way out but a reload.
+    connectTimeoutRef.current = setTimeout(() => {
+      if (statusRef.current !== "connected") {
+        cleanup();
+        setStatusBoth("error");
+        playSound("error");
+        setError(
+          "Couldn't connect the call — your network may be blocking it. Try again, or switch between wifi and mobile data.",
+        );
+      }
+    }, CONNECT_TIMEOUT_MS);
+
     try {
+      // getUserMedia only exists in a secure context. Over plain HTTP on a
+      // LAN IP (phone testing against a dev machine) `mediaDevices` is
+      // undefined outright, which would otherwise surface as a confusing
+      // "cannot read properties of undefined".
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          "Voice calls need a secure (HTTPS) connection. On a phone over local wifi, use the deployed site instead.",
+        );
+      }
+
       const sessionRes = await fetch("/api/realtime/session", { method: "POST" });
       if (!sessionRes.ok) {
         const body: { error?: string; detail?: string } = await sessionRes
@@ -323,12 +457,43 @@ export function useRealtimeVoice() {
       const session: { clientSecret?: string; model?: string } = await sessionRes.json();
       if (!session.clientSecret) throw new Error("No session credential returned");
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (micErr) {
+        // Re-thrown with a human message — the raw DOMException text
+        // ("Could not start audio source") is what users were seeing.
+        throw new Error(micErrorMessage(micErr));
+      }
       streamRef.current = stream;
 
-      const pc = new RTCPeerConnection();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
       pcRef.current = pc;
       for (const track of stream.getTracks()) pc.addTrack(track, stream);
+
+      // ICE can fail long before the timeout above fires — surface it
+      // immediately rather than making the user wait out the full 20s.
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed") {
+          cleanup();
+          setStatusBoth("error");
+          playSound("error");
+          setError(
+            "The call couldn't connect. Your network may be blocking voice traffic — try again, or switch between wifi and mobile data.",
+          );
+        }
+      };
+      // A call that drops mid-conversation should end cleanly, not freeze
+      // showing a connected UI that no longer has a peer on the far end.
+      pc.oniceconnectionstatechange = () => {
+        if (
+          pc.iceConnectionState === "failed" &&
+          statusRef.current === "connected"
+        ) {
+          setError("The call dropped.");
+          stop();
+        }
+      };
 
       const audioEl = document.createElement("audio");
       audioEl.autoplay = true;
@@ -346,6 +511,13 @@ export function useRealtimeVoice() {
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
       dc.onopen = () => {
+        // Connected for real — call off the watchdog and the connecting
+        // feedback (rotating message + repeating tick), then mark the
+        // transition with a distinctly different sound so it's obvious the
+        // wait is over, not just another tick.
+        if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+        stopConnectFeedback();
         setStatusBoth("connected");
         playSound("ready");
         // Without this, the model just sits there waiting for the user to
@@ -409,7 +581,7 @@ export function useRealtimeVoice() {
       playSound("error");
       setError(err instanceof Error ? err.message : "Could not start voice call");
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: stop/cleanup/setStatusBoth/startVolumeLoop are stable refs-backed callbacks
+    // biome-ignore lint/correctness/useExhaustiveDependencies: stop/cleanup/setStatusBoth/startVolumeLoop/stopConnectFeedback are stable refs-backed callbacks
   }, [status]);
 
   return {
@@ -417,6 +589,7 @@ export function useRealtimeVoice() {
     isUserSpeaking,
     isAssistantSpeaking,
     assistantVolume,
+    connectingMessage,
     transcript,
     error,
     start,
