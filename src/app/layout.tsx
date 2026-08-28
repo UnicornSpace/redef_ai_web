@@ -95,7 +95,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased  bg-[#F7F5F3]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased  bg-[#F7F5F3]- bg-white`}
         suppressHydrationWarning
       >
         <ReferralCapture />

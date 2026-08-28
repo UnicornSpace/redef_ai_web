@@ -192,7 +192,7 @@ function VoiceChatMock() {
           {
             time: "10:00",
             label: "Investor call — prep notes attached",
-            color: "var(--rf-sky)",
+            color: "var(--rf-coral)",
           },
           {
             time: "09:15",
@@ -272,7 +272,7 @@ function UnifiedDayMock() {
       time: "14:00",
       label: "Team sync",
       tag: "calendar",
-      color: "var(--rf-sky)",
+      color: "var(--rf-coral)",
     },
   ];
   return (
@@ -396,7 +396,7 @@ function InsightMock() {
       pct: 84,
       color: "var(--rf-violet)",
     },
-    { label: "Meetings", value: "6h 45m", pct: 52, color: "var(--rf-sky)" },
+    { label: "Meetings", value: "6h 45m", pct: 52, color: "var(--rf-coral)" },
     {
       label: "Habits kept",
       value: "18 / 21",

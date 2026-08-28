@@ -16,7 +16,7 @@ const quotes: Quote[] = [
   {
     name: "Jamie Marshall",
     role: "Founder, Tech Startup",
-    color: "var(--rf-sky)",
+    color: "var(--rf-coral)",
     quote:
       "I've replaced five apps with one voice-first system. What used to be scattered across Notion, Calendar, and Todoist is now unified. I get my time back, my focus returns, and I actually trust my schedule again.",
     width: 540,

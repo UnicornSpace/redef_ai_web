@@ -166,7 +166,7 @@ function LeftCluster() {
         <Sparkle size={18} color="var(--g-stone)" />
       </Floaty>
       <Floaty style={{ left: 30, top: 130 }} delay={2}>
-        <Dot size={16} color="var(--g-sky)" />
+        <Dot size={16} color="var(--g-green)" />
       </Floaty>
       <Floaty style={{ left: 480, top: 300 }} delay={1.2}>
         <Dot size={13} color="var(--g-coral)" />

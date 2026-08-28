@@ -199,7 +199,7 @@ export function OnboardingClient({
                 <label
                   key={m.key}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors",
+                    "flex cursor-pointer items-center  gap-3 rounded-lg *:border p-4 transition-colors",
                     checked
                       ? "border-rf-green-deep/50 bg-g-green-pale"
                       : "border-line bg-paper",
@@ -213,7 +213,7 @@ export function OnboardingClient({
                     <span className="text-sm font-semibold text-ink">
                       {m.label}
                     </span>
-                    <span className="text-xs text-body-muted">
+                    <span className="text-[10px] text-body-muted">
                       {m.description}
                     </span>
                   </div>
