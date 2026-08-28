@@ -1,5 +1,6 @@
 "use server";
 
+import { currentOrigin } from "@/lib/request-origin";
 import { createClient } from "@/lib/server";
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -17,11 +18,11 @@ export async function connectGoogleCalendar(): Promise<{
   error?: string;
 }> {
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://redefai.app";
+  const origin = await currentOrigin();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl}/auth/callback?next=/app/calendar`,
+      redirectTo: `${origin}/auth/callback?next=/app/calendar`,
       scopes: "https://www.googleapis.com/auth/calendar.readonly",
       queryParams: {
         access_type: "offline",

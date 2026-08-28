@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { signInWithOAuth } from "@/actions/auth";
 import { GoogleIcon } from "@/components/auth/google-icon";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export function SignUpForm({
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
@@ -64,17 +66,47 @@ export function SignUpForm({
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsOAuthLoading(true);
+    setError(null);
+    try {
+      const res = await signInWithOAuth("google");
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+        setIsOAuthLoading(false);
+        return;
+      }
+      if (res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      setError("Something went wrong starting sign-up. Please try again.");
+      setIsOAuthLoading(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't reach the server. Check your connection and try again.",
+      );
+      toast.error("Couldn't start Google sign-in — check your connection.");
+      setIsOAuthLoading(false);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-5", className)} {...props}>
       <Button
         type="button"
         variant="outline"
         className="w-full"
-        onClick={() => signInWithOAuth("google")}
+        onClick={handleGoogleSignIn}
+        disabled={isOAuthLoading}
       >
         <GoogleIcon />
-        Continue with Google
+        {isOAuthLoading ? "Redirecting to Google..." : "Continue with Google"}
       </Button>
+      {error && <p className="text-center text-sm text-rf-coral">{error}</p>}
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
@@ -117,7 +149,6 @@ export function SignUpForm({
             onChange={(e) => setRepeatPassword(e.target.value)}
           />
         </div>
-        {error && <p className="text-sm text-rf-coral">{error}</p>}
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? "Creating your account..." : "Sign up"}
         </Button>

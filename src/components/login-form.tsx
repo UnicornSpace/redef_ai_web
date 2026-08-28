@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { signInWithOAuth } from "@/actions/auth";
 import { GoogleIcon } from "@/components/auth/google-icon";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
@@ -56,17 +58,59 @@ export function LoginForm({
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    // This button previously called signInWithOAuth and did nothing with
+    // the result — no loading state, no error surfaced. If the request
+    // failed for any reason (network hiccup, an origin Supabase's
+    // redirect-URL allowlist doesn't recognize, anything) the button just
+    // looked broken: no spinner, no message, nothing. That silence was
+    // the actual bug being reported, not just a coincidence alongside it.
+    setIsOAuthLoading(true);
+    setError(null);
+    try {
+      const res = await signInWithOAuth("google");
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error);
+        setIsOAuthLoading(false);
+        return;
+      }
+      if (res.url) {
+        // A real cross-origin navigation to Google's consent screen —
+        // router.push can't leave the app's own origin, only this can.
+        // Deliberately not resetting isOAuthLoading here: the button
+        // should stay in its loading state through the redirect rather
+        // than flash back to normal for the instant before the browser
+        // actually navigates away.
+        window.location.href = res.url;
+        return;
+      }
+      setError("Something went wrong starting sign-in. Please try again.");
+      setIsOAuthLoading(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't reach the server. Check your connection and try again.",
+      );
+      toast.error("Couldn't start Google sign-in — check your connection.");
+      setIsOAuthLoading(false);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-5", className)} {...props}>
       <Button
         type="button"
         variant="outline"
         className="w-full"
-        onClick={() => signInWithOAuth("google")}
+        onClick={handleGoogleSignIn}
+        disabled={isOAuthLoading}
       >
         <GoogleIcon />
-        Continue with Google
+        {isOAuthLoading ? "Redirecting to Google..." : "Continue with Google"}
       </Button>
+      {error && <p className="text-center text-sm text-rf-coral">{error}</p>}
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
@@ -107,7 +151,6 @@ export function LoginForm({
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        {error && <p className="text-sm text-rf-coral">{error}</p>}
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? "Logging in..." : "Log in"}
         </Button>

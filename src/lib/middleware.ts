@@ -11,19 +11,16 @@ import { type NextRequest, NextResponse } from "next/server";
 // /auth/login via the PROTECTED_PREFIXES check further down, same as
 // before — this just changes what an unmatched URL resolves to instead of
 // old marketing content.
+//
+// The check against this list runs further down in updateSession(), AFTER
+// the stray-"?code=" recovery — not before. Applying it first once sent a
+// Google OAuth redirect (which can legitimately land outside this list)
+// straight to /app with its "?code=" stripped, before the code was ever
+// exchanged. Keep it after.
 const ALLOWED_PREFIXES = ["/app", "/auth", "/api", "/onboarding", "/admin"];
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isAllowedPath = ALLOWED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-  if (!isAllowedPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
 
   // Forwarded as a request header so Server Components downstream (layouts,
   // pages) can read the current pathname via headers() — there's no other
@@ -85,6 +82,23 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
+  // MUST run after the stray-"?code=" recovery above, not before. This
+  // used to be the very first check in the function — which meant a Google
+  // redirect landing anywhere outside the allowlist (the exact fallback
+  // Supabase does when the Site URL doesn't match our redirectTo) got its
+  // "?code=" silently stripped by `url.search = ""` before the recovery
+  // check ever saw it, dumping the user back at /app still signed out.
+  // That was the whole "comes back from Google and nothing happens" bug.
+  const isAllowedPath = ALLOWED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  if (!isAllowedPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/app";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
