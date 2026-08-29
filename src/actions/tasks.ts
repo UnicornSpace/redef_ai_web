@@ -16,12 +16,22 @@ export async function listTasks(): Promise<Task[]> {
     .eq("is_deleted", false)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // `labels` is `null` for any row untouched since the category->labels
+  // migration (and would be missing entirely if that migration hasn't run
+  // yet) — every caller assumes a real array, so guarantee one here rather
+  // than at every call site.
+  return (data ?? []).map((t) => ({ ...t, labels: t.labels ?? [] }));
+}
+
+function normalizeLabels(labels: string[] | null | undefined): string[] {
+  return Array.from(
+    new Set((labels ?? []).map((l) => l.trim()).filter(Boolean)),
+  );
 }
 
 export async function createTask(input: {
   name: string;
-  category?: string | null;
+  labels?: string[] | null;
   dueDate?: string | null;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
@@ -34,10 +44,29 @@ export async function createTask(input: {
   const { error } = await supabase.from("tasks").insert({
     id: crypto.randomUUID(),
     name,
-    category: input.category?.trim() || null,
+    labels: normalizeLabels(input.labels),
     due_date: input.dueDate || null,
     user_id: user.user.id,
   });
+  if (error) return { error: error.message };
+
+  revalidatePath("/app/tasks");
+  return {};
+}
+
+export async function updateTaskLabels(
+  taskId: string,
+  labels: string[],
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return { error: "Not signed in" };
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ labels: normalizeLabels(labels) })
+    .eq("id", taskId)
+    .eq("user_id", user.user.id);
   if (error) return { error: error.message };
 
   revalidatePath("/app/tasks");

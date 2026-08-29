@@ -262,12 +262,13 @@ export async function listUsersForAdmin(
 }
 
 /**
- * Drill-down for one user — always lifetime totals (not range-scoped like
- * the list view) since this is meant to answer "how active has this person
- * ever been", not "in the currently-selected window".
+ * Drill-down for one user, scoped to `range` the same way the list view is
+ * — "how active has this person been in the last 7 days" vs the default
+ * "all" for the original lifetime-totals view.
  */
 export async function getUserActivityDetail(
   userId: string,
+  range: AdminRange = "all",
 ): Promise<UserActivityDetail | null> {
   if (!(await isCurrentUserAdmin())) return null;
 
@@ -276,12 +277,22 @@ export async function getUserActivityDetail(
   const authUser = userRes?.user;
   if (!authUser) return null;
 
-  const countOf = (table: string) =>
-    admin
+  const since = rangeStartIso(range);
+
+  const countOf = (table: string, dateColumn: string) => {
+    let query = admin
       .from(table)
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .then((r) => r.count ?? 0);
+      .eq("user_id", userId);
+    if (since) query = query.gte(dateColumn, since);
+    return query.then((r) => r.count ?? 0);
+  };
+
+  let tokenQuery = admin
+    .from("chat_usage")
+    .select("input_tokens, output_tokens")
+    .eq("user_id", userId);
+  if (since) tokenQuery = tokenQuery.gte("created_at", since);
 
   const [
     profileRes,
@@ -295,16 +306,13 @@ export async function getUserActivityDetail(
     referredByRes,
   ] = await Promise.all([
     admin.from("profiles").select("username").eq("user_id", userId).maybeSingle(),
-    countOf("habits"),
-    countOf("tasks"),
-    countOf("transactions"),
-    countOf("chats"),
-    countOf("deepwork_sessions"),
-    countOf("goals"),
-    admin
-      .from("chat_usage")
-      .select("input_tokens, output_tokens")
-      .eq("user_id", userId),
+    countOf("habits", "created_at"),
+    countOf("tasks", "created_at"),
+    countOf("transactions", "created_at"),
+    countOf("chats", "updated_at"),
+    countOf("deepwork_sessions", "created_at"),
+    countOf("goals", "created_at"),
+    tokenQuery,
     admin
       .from("user_preferences")
       .select("user_id, nickname")
@@ -345,16 +353,25 @@ export async function getUserActivityDetail(
     );
   }
 
-  // One extra lookup per referred user for their avatar — fine at the
-  // scale a single person's referral list runs at (this is the detail
-  // page, not the full user list, which already has avatars for free from
-  // its one listUsers() call).
-  const referredAvatars = new Map(
+  // One extra lookup per referred user for their avatar (and, same call,
+  // their auth-side created_at — the same range-gating source
+  // listUsersForAdmin uses for referral credit, rather than profiles'
+  // created_at which can lag signup slightly). Fine at the scale a single
+  // person's referral list runs at (this is the detail page, not the full
+  // user list, which already has avatars for free from its one
+  // listUsers() call).
+  const referredAuthInfo = new Map(
     (
       await Promise.all(
         referredIds.map(async (id) => {
           const { data } = await admin.auth.admin.getUserById(id);
-          return [id, avatarUrlOf(data?.user?.user_metadata)] as const;
+          return [
+            id,
+            {
+              avatarUrl: avatarUrlOf(data?.user?.user_metadata),
+              createdAt: data?.user?.created_at ?? null,
+            },
+          ] as const;
         }),
       )
     ),
@@ -365,14 +382,21 @@ export async function getUserActivityDetail(
     nickname: string | null;
   }[])
     .filter((r) => r.user_id)
+    // Same range as everything else on this page — a referral only counts
+    // toward the selected window if the REFERRED person signed up in it.
+    .filter((r) => {
+      const createdAt = referredAuthInfo.get(r.user_id as string)?.createdAt;
+      return !since || (createdAt != null && createdAt >= since);
+    })
     .map((r) => {
       const profile = referredProfiles.get(r.user_id as string);
+      const authInfo = referredAuthInfo.get(r.user_id as string);
       return {
         userId: r.user_id as string,
         displayName: r.nickname || profile?.username || "A new member",
         username: profile?.username ?? null,
-        avatarUrl: referredAvatars.get(r.user_id as string) ?? null,
-        joinedAt: profile?.created_at ?? null,
+        avatarUrl: authInfo?.avatarUrl ?? null,
+        joinedAt: profile?.created_at ?? authInfo?.createdAt ?? null,
       };
     });
 
@@ -392,4 +416,177 @@ export async function getUserActivityDetail(
     tokens: { ...tokens, total: tokens.input + tokens.output },
     referrals,
   };
+}
+
+export interface DailyModuleUsage {
+  date: string;
+  habits: number;
+  tasks: number;
+  deepWork: number;
+  personalFinance: number;
+  chats: number;
+}
+
+export interface ModuleTotal {
+  module: string;
+  count: number;
+}
+
+export interface TopReferrer {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  referralCount: number;
+}
+
+export interface UsageAnalytics {
+  /** Zero-filled, oldest first, fixed 30-day window — a daily chart over
+      "all time" would be unusable, so this doesn't take an AdminRange. */
+  daily: DailyModuleUsage[];
+  /** All-time row count per module/table, sorted most-used first. */
+  totalsByModule: ModuleTotal[];
+  topReferrers: TopReferrer[];
+}
+
+function localDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const USAGE_WINDOW_DAYS = 30;
+
+/**
+ * "Which feature is actually used, and on which days" — the whole point is
+ * answering that from data this app already has (habits/tasks/deep-work/
+ * finance row counts + chat activity), not PostHog: nothing in the app
+ * sends a custom PostHog event today, only its default autocapture
+ * (pageviews/clicks), which can't answer a per-feature usage question.
+ */
+export async function getUsageAnalytics(): Promise<UsageAnalytics> {
+  if (!(await isCurrentUserAdmin())) {
+    return { daily: [], totalsByModule: [], topReferrers: [] };
+  }
+  const admin = createAdminClient();
+
+  const windowStart = new Date();
+  windowStart.setHours(0, 0, 0, 0);
+  windowStart.setDate(windowStart.getDate() - (USAGE_WINDOW_DAYS - 1));
+  const windowStartIso = windowStart.toISOString();
+
+  const [
+    habitsWindow,
+    tasksWindow,
+    deepWorkWindow,
+    financeWindow,
+    chatsWindow,
+    habitsTotal,
+    tasksTotal,
+    deepWorkTotal,
+    financeTotal,
+    chatsTotal,
+    authUsers,
+    referredByRes,
+    profilesRes,
+  ] = await Promise.all([
+    admin.from("habits").select("created_at").gte("created_at", windowStartIso),
+    admin.from("tasks").select("created_at").gte("created_at", windowStartIso),
+    admin
+      .from("deepwork_sessions")
+      .select("created_at")
+      .gte("created_at", windowStartIso),
+    admin
+      .from("transactions")
+      .select("created_at")
+      .gte("created_at", windowStartIso),
+    admin.from("chats").select("updated_at").gte("updated_at", windowStartIso),
+    admin.from("habits").select("id", { count: "exact", head: true }).then((r) => r.count ?? 0),
+    admin.from("tasks").select("id", { count: "exact", head: true }).then((r) => r.count ?? 0),
+    admin
+      .from("deepwork_sessions")
+      .select("id", { count: "exact", head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .then((r) => r.count ?? 0),
+    admin.from("chats").select("id", { count: "exact", head: true }).then((r) => r.count ?? 0),
+    fetchAllAuthUsers(admin),
+    admin.from("user_preferences").select("referred_by").not("referred_by", "is", null),
+    admin.from("profiles").select("user_id, username"),
+  ]);
+
+  const buckets = new Map<string, DailyModuleUsage>();
+  for (let i = 0; i < USAGE_WINDOW_DAYS; i++) {
+    const d = new Date(windowStart);
+    d.setDate(windowStart.getDate() + i);
+    const key = localDayKey(d);
+    buckets.set(key, {
+      date: key,
+      habits: 0,
+      tasks: 0,
+      deepWork: 0,
+      personalFinance: 0,
+      chats: 0,
+    });
+  }
+  function bump(
+    rows: Record<string, unknown>[] | null,
+    field: Exclude<keyof DailyModuleUsage, "date">,
+    dateColumn: string,
+  ) {
+    for (const row of rows ?? []) {
+      const iso = row[dateColumn] as string | null;
+      if (!iso) continue;
+      const bucket = buckets.get(localDayKey(new Date(iso)));
+      if (bucket) bucket[field]++;
+    }
+  }
+  bump(habitsWindow.data, "habits", "created_at");
+  bump(tasksWindow.data, "tasks", "created_at");
+  bump(deepWorkWindow.data, "deepWork", "created_at");
+  bump(financeWindow.data, "personalFinance", "created_at");
+  bump(chatsWindow.data, "chats", "updated_at");
+
+  const daily = Array.from(buckets.values());
+
+  const totalsByModule: ModuleTotal[] = [
+    { module: "Habits", count: habitsTotal },
+    { module: "Tasks", count: tasksTotal },
+    { module: "Deep Work", count: deepWorkTotal },
+    { module: "Personal Finance", count: financeTotal },
+    { module: "AI Talk", count: chatsTotal },
+  ].sort((a, b) => b.count - a.count);
+
+  const referralCounts = new Map<string, number>();
+  for (const row of (referredByRes.data ?? []) as { referred_by: string | null }[]) {
+    if (!row.referred_by) continue;
+    referralCounts.set(row.referred_by, (referralCounts.get(row.referred_by) ?? 0) + 1);
+  }
+  const usernameByUser = new Map(
+    ((profilesRes.data ?? []) as { user_id: string; username: string }[]).map(
+      (p) => [p.user_id, p.username],
+    ),
+  );
+  const topReferrers: TopReferrer[] = authUsers
+    .map((u) => {
+      const code = referralCodeForUserId(u.id);
+      const email = u.email ?? null;
+      const fullName = u.user_metadata?.full_name as string | undefined;
+      const username = usernameByUser.get(u.id) ?? null;
+      return {
+        userId: u.id,
+        displayName: resolveDisplayName(fullName, email, username),
+        username,
+        avatarUrl: avatarUrlOf(u.user_metadata),
+        referralCount: referralCounts.get(code) ?? 0,
+      };
+    })
+    .filter((r) => r.referralCount > 0)
+    .sort((a, b) => b.referralCount - a.referralCount)
+    .slice(0, 5);
+
+  return { daily, totalsByModule, topReferrers };
 }

@@ -99,6 +99,18 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Frame } from "@/components/ui/frame";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
 export function FinanceClient({
   initialTransactions,
 }: {
@@ -397,7 +409,9 @@ export function FinanceClient({
                   <span
                     className={cn(
                       "text-2xl font-bold",
-                      type === "income" ? "text-rf-green-deep" : "text-rf-coral",
+                      type === "income"
+                        ? "text-rf-green-deep"
+                        : "text-rf-coral",
                     )}
                   >
                     {type === "income" ? "+" : "−"}
@@ -562,7 +576,7 @@ export function FinanceClient({
             );
             return (
               <div key={date} className="flex flex-col gap-1">
-                <div className="flex items-baseline justify-between px-1">
+                {/* <div className="flex items-baseline justify-between px-1">
                   <h3 className="text-sm font-semibold text-ink">
                     {dayLabel(date, today)}
                   </h3>
@@ -575,8 +589,131 @@ export function FinanceClient({
                     {net >= 0 ? "+" : "-"}
                     {formatMoney(Math.abs(net))}
                   </span>
-                </div>
-                <div className="rounded-2xl border border-line bg-paper">
+                </div> */}
+                <Frame className="w-full">
+                  <Table variant="card">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{dayLabel(date, today)}</TableHead>
+                        <TableHead></TableHead>
+                        {/* <TableHead></TableHead> */}
+                        <TableHead className="text-right">Budget</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((t, i) => (
+                        <>
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              {t.description || t.category || "Untitled"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {/* <span
+                                  aria-hidden="true"
+                                  className="size-1.5 rounded-full bg-red-500"
+                                /> */}
+                                {t.category ? <span>{t.category}</span> : null}
+                                {t.space ? (
+                                  <span className="rounded-full bg-line px-1.5 py-0.5">
+                                    {t.space}
+                                  </span>
+                                ) : null}
+                              </Badge>
+                            </TableCell>
+                            {/* <TableCell>Security Team</TableCell> */}
+                            <TableCell
+                              className={cn(
+                                "text-right",
+                                t.type === "income"
+                                  ? "text-rf-green-deep"
+                                  : "text-rf-coral",
+                              )}
+                            >
+                              {t.type === "income" ? "+" : "-"}
+                              {formatMoney(t.amount)}
+                            </TableCell>
+                          </TableRow>
+                          {/* <div
+                            key={t.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenEdit(t)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleOpenEdit(t);
+                              }
+                            }}
+                            className={cn(
+                              "flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40",
+                              i !== items.length - 1 && "border-b border-line",
+                            )}
+                          >
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate text-sm text-ink">
+                                {t.description || t.category || "Untitled"}
+                              </span>
+                              <span className="flex flex-wrap gap-1.5 text-xs text-body-muted">
+                                {t.category ? <span>{t.category}</span> : null}
+                                {t.space ? (
+                                  <span className="rounded-full bg-line px-1.5 py-0.5">
+                                    {t.space}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                            <span
+                              className={cn(
+                                "tabular-nums shrink-0 text-sm font-semibold",
+                                t.type === "income"
+                                  ? "text-rf-green-deep"
+                                  : "text-rf-coral",
+                              )}
+                            >
+                              {t.type === "income" ? "+" : "-"}
+                              {formatMoney(t.amount)}
+                            </span>
+                          </div> */}
+                        </>
+                      ))}
+                      {/* <TableRow>
+                        <TableCell className="font-medium">
+                          Security Audit
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            <span
+                              aria-hidden="true"
+                              className="size-1.5 rounded-full bg-red-500"
+                            />
+                            Failed
+                          </Badge>
+                        </TableCell>
+                        <TableCell>Security Team</TableCell>
+                        <TableCell className="text-right">$2,100</TableCell>
+                      </TableRow> */}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell colSpan={2}>Total Budget</TableCell>
+                        <TableCell className="text-right">
+                          {" "}
+                          <span
+                            className={cn(
+                              "tabular-nums text-xs font-semibold",
+                              net >= 0 ? "text-rf-green-deep" : "text-rf-coral",
+                            )}
+                          >
+                            {net >= 0 ? "+" : "-"}
+                            {formatMoney(Math.abs(net))}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </Frame>
+                {/* <div className="rounded-2xl border border-line bg-paper">
                   {items.map((t, i) => (
                     <div
                       key={t.id}
@@ -620,7 +757,7 @@ export function FinanceClient({
                       </span>
                     </div>
                   ))}
-                </div>
+                </div> */}
               </div>
             );
           })}

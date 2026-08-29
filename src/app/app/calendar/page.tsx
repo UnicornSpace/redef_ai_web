@@ -74,7 +74,7 @@ async function CalendarData() {
       id: t.id,
       title: t.name,
       date: t.due_date as string,
-      color: colorForLabel(t.category),
+      color: colorForLabel(t.labels[0]),
       completed: t.is_completed,
       href: "/app/tasks",
     }));

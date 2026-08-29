@@ -2,10 +2,15 @@
 
 import confetti from "canvas-confetti";
 import { play as playSound } from "cuelume";
-import { Check, ChevronDown, Flame } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { getHabitCompletionForDate } from "@/actions/habits";
+import {
+  getHabitCompletionForDate,
+  getHabitCompletionsForRange,
+  type HabitCompletionDetail,
+  type HabitRangeCompletions,
+} from "@/actions/habits";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -122,28 +127,58 @@ function computeStreak(completed: Set<string>, today: Date): number {
 }
 
 /**
+ * Real per-date numeric/checklist detail for a habit. `listHabits` only
+ * bulk-loads TODAY's state (todayNumericValue/todayCompletedItemIds) — for
+ * any other date this reads the range map populated by
+ * getHabitCompletionsForRange (fetched by FocusView for whatever week is
+ * currently visible in the matrix).
+ */
+function habitCompletionDetailFor(
+  habit: HabitListItem,
+  dateKeyStr: string,
+  todayKey: string,
+  rangeCompletions: HabitRangeCompletions,
+): HabitCompletionDetail {
+  if (dateKeyStr === todayKey) {
+    return {
+      completedItemIds: habit.todayCompletedItemIds ?? [],
+      numericValue: habit.todayNumericValue ?? null,
+    };
+  }
+  return (
+    rangeCompletions[habit.id]?.[dateKeyStr] ?? {
+      completedItemIds: [],
+      numericValue: null,
+    }
+  );
+}
+
+/**
  * Ratio of a habit's progress on a given date, on a 0..1 scale. Boolean
- * habits are 0/1; number/checklist habits only reflect "today's" live
- * progress from the server (todayNumericValue, todayCompletedItemIds),
- * because those are the fields listHabits populates — for past dates
- * we fall back to the binary "was that day in completed_dates".
+ * habits are always 0/1 (there's no partial state for a plain checkbox).
+ * Number/checklist habits are proportional for ANY date now, using
+ * `rangeCompletions` for non-today dates and the today-only fields for
+ * today (byte-identical to the old today path, zero extra latency).
  */
 function habitProgressRatio(
   habit: HabitListItem,
   dateKeyStr: string,
   todayKey: string,
+  rangeCompletions: HabitRangeCompletions,
 ): number {
-  const isToday = dateKeyStr === todayKey;
-  if (!isToday) {
-    return isHabitDoneOn(habit, dateKeyStr) ? 1 : 0;
-  }
   if (habit.type === "boolean" || habit.type === "smart_checklist") {
     return isHabitDoneOn(habit, dateKeyStr) ? 1 : 0;
   }
+  const detail = habitCompletionDetailFor(
+    habit,
+    dateKeyStr,
+    todayKey,
+    rangeCompletions,
+  );
   if (habit.type === "number") {
     const goal = habit.goal_number;
     if (!goal || goal <= 0) return 0;
-    const value = habit.todayNumericValue ?? 0;
+    const value = detail.numericValue ?? 0;
     if (habit.goal_comparator === "less_than") {
       return value < goal ? 1 : 0;
     }
@@ -153,7 +188,7 @@ function habitProgressRatio(
     const items = habit.checklistItems ?? [];
     const required = items.filter((i) => !i.is_optional);
     if (required.length === 0) return 0;
-    const doneIds = new Set(habit.todayCompletedItemIds ?? []);
+    const doneIds = new Set(detail.completedItemIds);
     const doneRequired = required.filter((i) => doneIds.has(i.id)).length;
     return doneRequired / required.length;
   }
@@ -251,6 +286,7 @@ function ChecklistRow({
   habit,
   displayKey,
   todayKey,
+  rangeCompletions,
   isExpanded,
   streak,
   onToggleBoolean,
@@ -261,23 +297,24 @@ function ChecklistRow({
   habit: HabitListItem;
   displayKey: string;
   todayKey: string;
+  rangeCompletions: HabitRangeCompletions;
   isExpanded: boolean;
   streak: number;
   onToggleBoolean: (habit: HabitListItem) => void;
   onOpenNumberDialog: (habit: HabitListItem) => void;
   onToggleExpanded: (habitId: string) => void;
-  onToggleChecklistItem: (habitId: string, itemId: string) => void;
+  onToggleChecklistItem: (habitId: string, itemId: string, dateKey: string) => void;
 }) {
-  const ratio = habitProgressRatio(habit, displayKey, todayKey);
+  const ratio = habitProgressRatio(habit, displayKey, todayKey, rangeCompletions);
   const isDone = ratio >= 1;
   const items = habit.checklistItems ?? [];
-  const doneItemIds = new Set(
-    // Sub-item tracking is a "today" concept in the current data model —
-    // for past dates we don't have per-item completion, only the rollup
-    // completed_dates. So a past checklist habit expands but shows all
-    // items un-ticked; users can still add today via the strip's Today.
-    displayKey === todayKey ? habit.todayCompletedItemIds ?? [] : [],
+  const detail = habitCompletionDetailFor(
+    habit,
+    displayKey,
+    todayKey,
+    rangeCompletions,
   );
+  const doneItemIds = new Set(detail.completedItemIds);
 
   function handleClick() {
     if (habit.type === "boolean" || habit.type === "smart_checklist") {
@@ -300,7 +337,7 @@ function ChecklistRow({
 
   const rightMeta = (() => {
     if (habit.type === "number" && habit.goal_number) {
-      const value = habit.todayNumericValue ?? 0;
+      const value = detail.numericValue ?? 0;
       const unit = habit.goal_unit ? ` ${habit.goal_unit}` : "";
       return (
         <span className="shrink-0 text-[11px] tabular-nums text-body-muted">
@@ -388,7 +425,9 @@ function ChecklistRow({
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => onToggleChecklistItem(habit.id, item.id)}
+                  onClick={() =>
+                    onToggleChecklistItem(habit.id, item.id, displayKey)
+                  }
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-sm transition-colors hover:bg-white/60"
                 >
                   <span
@@ -425,41 +464,100 @@ function ChecklistRow({
   );
 }
 
+function weekRangeLabel(days: Date[]): string {
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(days[0])} – ${fmt(days[6])}`;
+}
+
 /**
  * Habit × day weekly grid (desktop right pane). Rows are habits sorted
- * by name; columns are the 7 days centered on today.
+ * by name; columns are 7 days, paged a week at a time via the chevrons.
+ * Cells are real buttons — clicking one focuses that date, which drives
+ * the left "to do" list via `selectedKey` in the parent. Fill is
+ * proportional for number/checklist habits (via `rangeCompletions`), and
+ * cells before a habit's start date or after its end date are dimmed
+ * rather than shown as a false "missed".
  */
 function HabitWeekMatrix({
   habits,
-  today,
+  days,
+  weekOffset,
+  todayKey,
+  selectedKey,
+  rangeCompletions,
+  isRangeLoading,
+  onSelectDate,
+  onPrevWeek,
+  onNextWeek,
+  onResetWeek,
 }: {
   habits: HabitListItem[];
-  today: Date;
+  days: Date[];
+  weekOffset: number;
+  todayKey: string;
+  selectedKey: string;
+  rangeCompletions: HabitRangeCompletions;
+  isRangeLoading: boolean;
+  onSelectDate: (key: string) => void;
+  onPrevWeek: () => void;
+  onNextWeek: () => void;
+  onResetWeek: () => void;
 }) {
-  const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(today, i - 3)),
-    [today],
+  const header = (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-body-muted">
+          {weekOffset === 0 ? "This week at a glance" : weekRangeLabel(days)}
+        </h3>
+        <span className="text-xs text-body-muted tabular-nums">
+          {isRangeLoading ? "Loading…" : `${habits.length} habits`}
+        </span>
+      </div>
+      <div className="flex items-center gap-1">
+        {weekOffset !== 0 ? (
+          <button
+            type="button"
+            onClick={onResetWeek}
+            className="mr-1 text-[11px] font-semibold text-rf-green-deep hover:underline"
+          >
+            Today
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onPrevWeek}
+          aria-label="Previous week"
+          className="flex size-6 items-center justify-center rounded-md text-body-muted transition-colors hover:bg-line/60 hover:text-ink"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={onNextWeek}
+          aria-label="Next week"
+          className="flex size-6 items-center justify-center rounded-md text-body-muted transition-colors hover:bg-line/60 hover:text-ink"
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
   );
-  const todayKey = dateKey(today);
 
   if (habits.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-line bg-paper/40 px-4 py-8 text-center text-sm text-body-muted">
-        Add a habit to start filling in your week.
+      <div className="flex flex-col gap-3 rounded-xl border border-line bg-paper p-4">
+        {header}
+        <div className="rounded-xl border border-dashed border-line bg-paper/40 px-4 py-8 text-center text-sm text-body-muted">
+          Add a habit to start filling in your week.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line bg-paper p-4">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wide text-body-muted">
-          This week at a glance
-        </h3>
-        <span className="text-xs text-body-muted tabular-nums">
-          {habits.length} habits
-        </span>
-      </div>
+      {header}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -469,23 +567,26 @@ function HabitWeekMatrix({
                 const key = dateKey(day);
                 const isTodayCol = key === todayKey;
                 return (
-                  <th
-                    key={key}
-                    className={cn(
-                      "px-1 pb-1 text-center text-[10px] font-semibold uppercase tracking-wide",
-                      isTodayCol ? "text-ink" : "text-body-muted",
-                    )}
-                  >
-                    {SHORT_WEEKDAYS[day.getDay()]}
-                    <br />
-                    <span
+                  <th key={key} className="px-1 pb-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectDate(key)}
                       className={cn(
-                        "text-xs font-bold",
-                        isTodayCol ? "text-rf-green-deep" : "text-ink",
+                        "w-full rounded-md text-[10px] font-semibold uppercase tracking-wide transition-colors hover:bg-line/60",
+                        isTodayCol ? "text-ink" : "text-body-muted",
                       )}
                     >
-                      {day.getDate()}
-                    </span>
+                      {SHORT_WEEKDAYS[day.getDay()]}
+                      <br />
+                      <span
+                        className={cn(
+                          "text-xs font-bold",
+                          isTodayCol ? "text-rf-green-deep" : "text-ink",
+                        )}
+                      >
+                        {day.getDate()}
+                      </span>
+                    </button>
                   </th>
                 );
               })}
@@ -493,7 +594,10 @@ function HabitWeekMatrix({
           </thead>
           <tbody>
             {habits.map((habit) => {
-              const completed = new Set(habit.completed_dates ?? []);
+              const startedAt = habit.started_at.slice(0, 10);
+              const endAt = habit.end_date
+                ? habit.end_date.slice(0, 10)
+                : "9999-12-31";
               return (
                 <tr key={habit.id} className="border-t border-line">
                   <td className="max-w-40 truncate py-2 pr-3 text-sm text-ink">
@@ -504,20 +608,56 @@ function HabitWeekMatrix({
                   </td>
                   {days.map((day) => {
                     const key = dateKey(day);
-                    const isDone = completed.has(key);
-                    const isFuture = day.getTime() > today.getTime();
+                    const isFuture = key > todayKey;
+                    const isInactive = key < startedAt || key > endAt;
+                    const ratio =
+                      isFuture || isInactive
+                        ? 0
+                        : habitProgressRatio(
+                            habit,
+                            key,
+                            todayKey,
+                            rangeCompletions,
+                          );
+                    const isSelectedCol = key === selectedKey;
                     return (
                       <td key={key} className="px-1 py-1.5">
-                        <div
+                        <button
+                          type="button"
+                          onClick={() => onSelectDate(key)}
+                          disabled={isFuture}
+                          aria-label={`${habit.name}, ${key}`}
+                          aria-pressed={isSelectedCol}
                           className={cn(
-                            "mx-auto size-6 rounded-[4px]",
-                            isFuture
-                              ? "bg-line/40"
-                              : isDone
-                                ? "bg-rf-green-deep"
-                                : "bg-line",
+                            "relative mx-auto block size-6 overflow-hidden rounded-[4px] transition-colors",
+                            isSelectedCol && "ring-2 ring-rf-green-deep ring-offset-1",
+                            isFuture && "cursor-default bg-line/40",
+                            !isFuture &&
+                              isInactive &&
+                              "cursor-default bg-line opacity-20",
+                            !isFuture &&
+                              !isInactive &&
+                              ratio <= 0 &&
+                              "bg-line hover:bg-body-muted/40",
+                            !isFuture &&
+                              !isInactive &&
+                              ratio > 0 &&
+                              ratio < 1 &&
+                              "bg-line",
+                            !isFuture &&
+                              !isInactive &&
+                              ratio >= 1 &&
+                              "bg-rf-green-deep hover:bg-rf-green-deep/80",
                           )}
-                        />
+                        >
+                          {!isFuture && !isInactive && ratio > 0 && ratio < 1 ? (
+                            <span
+                              aria-hidden
+                              className="absolute inset-x-0 bottom-0 bg-rf-green-deep/70"
+                              style={{ height: `${Math.round(ratio * 100)}%` }}
+                            />
+                          ) : null}
+                        </button>
                       </td>
                     );
                   })}
@@ -687,6 +827,9 @@ export function FocusView({
   onToggleHabitOnDate,
   onToggleChecklistItem,
   onLogNumber,
+  rangeCompletions,
+  onRangeCompletionsLoaded,
+  onSelectedDateChange,
 }: {
   habits: HabitListItem[];
   /** Toggle today. Used for the boolean/checklist type-defaults on the
@@ -696,8 +839,16 @@ export function FocusView({
       another day, tick it off there" path. No confetti (celebration only
       makes sense for the live day). */
   onToggleHabitOnDate: (habit: HabitListItem, dateKey: string) => void;
-  onToggleChecklistItem: (habitId: string, itemId: string) => void;
+  onToggleChecklistItem: (habitId: string, itemId: string, dateKey: string) => void;
   onLogNumber: (habitId: string, date: string, value: number) => void;
+  /** Owned by HabitsClient (not local state here) so a number logged
+      against a non-today date from the desktop matrix can be patched
+      optimistically the same way today's fields already are. */
+  rangeCompletions: HabitRangeCompletions;
+  onRangeCompletionsLoaded: (patch: HabitRangeCompletions) => void;
+  /** Reports the desktop matrix's selected date up so the Add-habit
+      dialog can default its start date to whatever day is focused. */
+  onSelectedDateChange?: (dateKey: string) => void;
 }) {
   const today = useMemo(() => new Date(), []);
   const todayKey = dateKey(today);
@@ -721,6 +872,68 @@ export function FocusView({
     () => habits.filter((h) => h.type !== "smart_checklist"),
     [habits],
   );
+
+  // How many weeks the desktop matrix has paged away from the current
+  // week. Paging shifts selectedKey by the same ±7 days in lockstep — a
+  // date shifted by a whole number of weeks keeps the same weekday, so
+  // selectedKey always lands back inside the newly-visible window with no
+  // separate "snap to a valid day" step needed.
+  const [weekOffset, setWeekOffset] = useState(0);
+  const matrixDays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => addDays(today, i - 3 + weekOffset * 7)),
+    [today, weekOffset],
+  );
+
+  function stepMatrixWeek(delta: number) {
+    setWeekOffset((w) => w + delta);
+    setSelectedKey((k) => dateKey(addDays(new Date(`${k}T00:00:00`), delta * 7)));
+  }
+  function resetMatrixWeek() {
+    setWeekOffset(0);
+    setSelectedKey(todayKey);
+  }
+
+  // The matrix's default ±3-day window already has 6 non-today cells, so
+  // this has to fetch on mount too, not just after paging — only TODAY's
+  // numeric/checklist detail is bulk-loaded by listHabits. Reported up to
+  // HabitsClient (rather than kept as local state) so a number logged
+  // against a non-today date can be optimistically patched the same way
+  // today's fields already are.
+  const [isRangeLoading, setIsRangeLoading] = useState(false);
+  const habitIdsKey = useMemo(
+    () =>
+      focusHabits
+        .map((h) => h.id)
+        .sort()
+        .join(","),
+    [focusHabits],
+  );
+  const rangeStartKey = dateKey(matrixDays[0]);
+  const rangeEndKey = dateKey(matrixDays[6]);
+  useEffect(() => {
+    if (!habitIdsKey) return;
+    const habitIds = habitIdsKey.split(",");
+    let cancelled = false;
+    setIsRangeLoading(true);
+    getHabitCompletionsForRange(habitIds, rangeStartKey, rangeEndKey)
+      .then((patch) => {
+        if (!cancelled) onRangeCompletionsLoaded(patch);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Couldn't load that week's history");
+      })
+      .finally(() => {
+        if (!cancelled) setIsRangeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [habitIdsKey, rangeStartKey, rangeEndKey, onRangeCompletionsLoaded]);
+
+  useEffect(() => {
+    onSelectedDateChange?.(selectedKey);
+  }, [selectedKey, onSelectedDateChange]);
 
   // For each date the picker offers (30 past + today), compute the
   // aggregate completion ratio for that day so the filling can shows
@@ -776,8 +989,11 @@ export function FocusView({
     const done: HabitListItem[] = [];
     const remaining: HabitListItem[] = [];
     for (const h of focusHabits) {
-      if (habitProgressRatio(h, selectedKey, todayKey) >= 1) done.push(h);
-      else remaining.push(h);
+      if (habitProgressRatio(h, selectedKey, todayKey, rangeCompletions) >= 1) {
+        done.push(h);
+      } else {
+        remaining.push(h);
+      }
     }
     const bySort = (a: HabitListItem, b: HabitListItem) => {
       const p = priorityRank(a.priority) - priorityRank(b.priority);
@@ -787,7 +1003,7 @@ export function FocusView({
     done.sort(bySort);
     remaining.sort(bySort);
     return { done, remaining };
-  }, [focusHabits, selectedKey, todayKey]);
+  }, [focusHabits, selectedKey, todayKey, rangeCompletions]);
 
   const doneCount = done.length;
   const totalCount = focusHabits.length;
@@ -836,16 +1052,17 @@ export function FocusView({
   }
 
   function handleToggleChecklistItemInner(habitId: string, itemId: string) {
-    if (selectedKey !== todayKey) {
-      toast.error("Sub-items can only be checked for today.");
-      return;
-    }
     const habit = habits.find((h) => h.id === habitId);
     const doneNow = habit
-      ? (habit.todayCompletedItemIds ?? []).includes(itemId)
+      ? habitCompletionDetailFor(
+          habit,
+          selectedKey,
+          todayKey,
+          rangeCompletions,
+        ).completedItemIds.includes(itemId)
       : false;
     playSound(doneNow ? "release" : "success");
-    onToggleChecklistItem(habitId, itemId);
+    onToggleChecklistItem(habitId, itemId, selectedKey);
   }
 
   const renderRow = (habit: HabitListItem) => (
@@ -854,6 +1071,7 @@ export function FocusView({
       habit={habit}
       displayKey={selectedKey}
       todayKey={todayKey}
+      rangeCompletions={rangeCompletions}
       isExpanded={expandedChecklistId === habit.id}
       streak={streakByHabit.get(habit.id) ?? 0}
       onToggleBoolean={handleToggleBoolean}
@@ -949,7 +1167,19 @@ export function FocusView({
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div>{list}</div>
           <div className="hidden lg:block">
-            <HabitWeekMatrix habits={focusHabits} today={today} />
+            <HabitWeekMatrix
+              habits={focusHabits}
+              days={matrixDays}
+              weekOffset={weekOffset}
+              todayKey={todayKey}
+              selectedKey={selectedKey}
+              rangeCompletions={rangeCompletions}
+              isRangeLoading={isRangeLoading}
+              onSelectDate={setSelectedKey}
+              onPrevWeek={() => stepMatrixWeek(-1)}
+              onNextWeek={() => stepMatrixWeek(1)}
+              onResetWeek={resetMatrixWeek}
+            />
           </div>
         </div>
       </div>

@@ -38,18 +38,26 @@ export default async function AdminLayout({
     <div className={`redef redef-surface ${manrope.className}`}>
       <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4 md:px-8">
-          <Link
-            href="/admin"
-            className="text-sm flex items-center gap-2 font-extrabold tracking-tight text-ink"
-          >
-            <Image
-              src="/logo.png"
-              alt="Admin"
-              width={24}
-              height={24}
-            />
-            <span className="font-semibold">Admin</span>
-          </Link>
+          <div className="flex items-center gap-5">
+            <Link
+              href="/admin"
+              className="text-sm flex items-center gap-2 font-extrabold tracking-tight text-ink"
+            >
+              <Image
+                src="/logo.png"
+                alt="Admin"
+                width={24}
+                height={24}
+              />
+              <span className="font-semibold">Admin</span>
+            </Link>
+            <Link
+              href="/admin/usage"
+              className="text-sm font-medium text-body-muted hover:text-ink"
+            >
+              Usage
+            </Link>
+          </div>
           <Link
             href="/app"
             className="text-sm font-medium text-body-muted hover:text-ink"

@@ -50,6 +50,16 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card";
+import { Frame } from "@/components/ui/frame";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { SlidingNumber } from "../sliding-number";
 import { time } from "console";
@@ -520,60 +530,62 @@ export function DeepWorkClient({
               0,
             );
             return (
-              <div key={dateStr} className="flex flex-col gap-1">
-                <div className="flex items-baseline justify-between px-1">
-                  <h3 className="text-sm font-semibold text-ink">
-                    {dayLabel(new Date(`${dateStr}T00:00:00`), now)}
-                  </h3>
-                  <span className="tabular-nums text-xs text-body-muted">
-                    {formatDuration(dayTotal)}
-                  </span>
-                </div>
-                <div className="rounded-2xl border border-line bg-paper">
-                  {items.map((session, i) => (
-                    <div
-                      key={session.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleOpenEditSession(session)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handleOpenEditSession(session);
-                        }
-                      }}
-                      className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 ${
-                        i !== items.length - 1 ? "border-b border-line" : ""
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <span className="text-sm text-ink">
-                          {session.project?.name ?? "No project"}
-                          {session.is_manual_entry ? (
-                            <span className="ml-2 text-xs text-body-muted">
-                              manual
+              <Frame key={dateStr} className="w-full">
+                <Table variant="card">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        {dayLabel(new Date(`${dateStr}T00:00:00`), now)}
+                      </TableHead>
+                      <TableHead className="text-right">Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((session) => (
+                      <TableRow
+                        key={session.id}
+                        className="cursor-pointer"
+                        onClick={() => handleOpenEditSession(session)}
+                      >
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-ink">
+                              {session.project?.name ?? "No project"}
+                              {session.is_manual_entry ? (
+                                <span className="ml-2 text-xs font-normal text-body-muted">
+                                  manual
+                                </span>
+                              ) : null}
                             </span>
-                          ) : null}
-                        </span>
-                        <span className="flex gap-2 text-xs text-body-muted">
-                          {new Date(session.start_time).toLocaleTimeString(
-                            undefined,
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}{" "}
-                          →{" "}
-                          {new Date(session.end_time).toLocaleTimeString(
-                            undefined,
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
-                        </span>
-                      </div>
-                      <span className="tabular-nums text-sm font-medium text-body-muted">
-                        {formatDuration(session.duration_in_seconds)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                            <span className="text-xs text-body-muted">
+                              {new Date(session.start_time).toLocaleTimeString(
+                                undefined,
+                                { hour: "2-digit", minute: "2-digit" },
+                              )}{" "}
+                              →{" "}
+                              {new Date(session.end_time).toLocaleTimeString(
+                                undefined,
+                                { hour: "2-digit", minute: "2-digit" },
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatDuration(session.duration_in_seconds)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatDuration(dayTotal)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </Frame>
             );
           })
         )}

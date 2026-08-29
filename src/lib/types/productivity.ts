@@ -2,7 +2,7 @@ export interface Task {
   id: string;
   user_id: string | null;
   name: string;
-  category: string | null;
+  labels: string[];
   due_date: string | null;
   is_completed: boolean;
   is_deleted: boolean;

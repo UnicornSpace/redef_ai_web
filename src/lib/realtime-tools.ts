@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   getDeepWorkSummaryTool,
   listDeepWorkProjectsTool,
+  listRecentDeepWorkSessionsTool,
   logDeepWorkSessionsTool,
+  updateDeepWorkSessionTool,
 } from "@/lib/ai-sdk-tools/deepwork";
 import {
   addTransactionTool,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/ai-sdk-tools/finance";
 import { getDayReviewTool } from "@/lib/ai-sdk-tools/day-review";
 import {
+  createHabitTool,
   listHabitsTool,
   logHabitNumberTool,
   toggleHabitChecklistItemTool,
@@ -64,6 +67,14 @@ const REGISTRY: Record<string, RegistryEntry> = {
   listDeepWorkProjects: { tool: listDeepWorkProjectsTool, moduleKey: "deep_work" },
   logDeepWorkSessions: { tool: logDeepWorkSessionsTool, moduleKey: "deep_work" },
   getDeepWorkSummary: { tool: getDeepWorkSummaryTool, moduleKey: "deep_work" },
+  listRecentDeepWorkSessions: {
+    tool: listRecentDeepWorkSessionsTool,
+    moduleKey: "deep_work",
+  },
+  updateDeepWorkSession: {
+    tool: updateDeepWorkSessionTool,
+    moduleKey: "deep_work",
+  },
   listHabits: { tool: listHabitsTool, moduleKey: "habits" },
   toggleHabitToday: { tool: toggleHabitTodayTool, moduleKey: "habits" },
   toggleHabitChecklistItem: {
@@ -71,6 +82,7 @@ const REGISTRY: Record<string, RegistryEntry> = {
     moduleKey: "habits",
   },
   logHabitNumber: { tool: logHabitNumberTool, moduleKey: "habits" },
+  createHabit: { tool: createHabitTool, moduleKey: "habits" },
   getFinanceSummary: { tool: getFinanceSummaryTool, moduleKey: "personal_finance" },
   listRecentTransactions: {
     tool: listRecentTransactionsTool,

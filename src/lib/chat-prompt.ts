@@ -148,6 +148,15 @@ GOOD:
 
 Keep it to one or two spoken sentences — this is a conversation, not a report being read aloud.`;
 
+// Some models narrate their own deliberation as plain text before landing
+// on an answer ("Let me think about this... okay, so..."). When the model
+// actually supports a real separate reasoning channel, the app already
+// renders that in its own collapsible block — this rule is for everything
+// else, where that narration would otherwise just BE the visible reply.
+const NO_VISIBLE_THINKING = `ANSWER DIRECTLY — DON'T NARRATE YOUR OWN THINKING
+
+Give the direct answer, not a walkthrough of how you got there. Never write things like "Let me think about this", "First, I'll check...", "Okay, so...", or reason out loud step by step before the actual reply. If something genuinely needs working out, do that silently and only say the conclusion — the same way you wouldn't think out loud to a friend before answering them.`;
+
 export function buildSystemPrompt(params: {
   preferences: UserPreferences | null;
   enabledModules: ModuleKey[];
@@ -212,13 +221,21 @@ If Deep Work is enabled AND the user describes work they did ("I worked 9-12 on 
 
 If Deep Work is enabled AND they ask how much they worked ("how much did I work this week?") — call getDeepWorkSummary with the matching range.
 
+If Deep Work is enabled AND they want to correct a session they already logged ("that should've ended at 3", "the morning one was on the wrong project") — call listRecentDeepWorkSessions first to find the right sessionId (never guess one), confirm which session you mean if more than one could match, then call updateDeepWorkSession with only the field(s) that changed.
+
 If Habits is enabled AND they ask about habits ("how are my habits doing?") — call listHabits.${mode === "text" ? " The UI renders chips; don't restate them." : ""} Use toggleHabitToday to mark one done.
+
+If Habits is enabled AND they want to start tracking something new ("I want to build a habit of...", "help me track...") — do NOT call createHabit immediately. Ask what you still need, one or two questions at a time, like you're setting it up with them: what to call it, whether it's a plain done/not-done habit, a checklist, or a number with a target — and for a number habit, the target and unit. Skip only what they already told you. Once you have enough, call createHabit and confirm what you set up.
 
 If Finance is enabled AND they mention spending/income ("I spent 12 on coffee", "how much did I spend yesterday?") — call the matching finance tool with the EXACT range they asked (yesterday means yesterday, not week). Never substitute a wider range because it's more convenient.
 
-If Tasks is enabled AND they mention a to-do ("remind me to email X", "what's on my list?") — call the tasks tool.
+If Tasks is enabled AND they mention a to-do ("remind me to email X", "what's on my list?") — call the tasks tool. Carry over any due date or category they mention ("by Friday", "for the trip") into addNewTask — don't drop it, and don't ask for one if they didn't give it.
+
+If Tasks is enabled, check getDayReview/getTasks for open tasks with a due date on or before today. Bring up an overdue or due-today task yourself, once, in your own words ("you said you'd email the landlord today — still on for that?") — don't wait to be asked, and don't just list them as data.
 
 For a whole-day recap ("how was my day?", "recap this week") — call every relevant tool with the SAME range for all of them, so the picture is consistent.
+
+${NO_VISIBLE_THINKING}
 
 ${mode === "voice" ? VOICE_OUTPUT_RULES : TEXT_OUTPUT_RULES}
 

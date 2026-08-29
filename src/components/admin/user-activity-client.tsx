@@ -1,6 +1,7 @@
 import { ChevronRightIcon, Users } from "lucide-react";
 import Link from "next/link";
-import type { UserActivityDetail } from "@/actions/admin";
+import { useRouter } from "next/navigation";
+import type { AdminRange, UserActivityDetail } from "@/actions/admin";
 import {
   Empty,
   EmptyDescription,
@@ -9,12 +10,29 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AVATAR_ACCENT_BG_CLASSES,
   accentIndexFor,
   initialsOf,
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+
+// Same labels/options as admin-dashboard-client.tsx's list-page selector —
+// duplicated rather than shared since it's a 4-entry lookup, matching how
+// small per-file constants like this already work elsewhere in the app.
+const RANGE_LABELS: Record<AdminRange, string> = {
+  "1d": "Last 24 hours",
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  all: "All time",
+};
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -36,7 +54,16 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
+export function UserActivityClient({
+  detail,
+  range,
+}: {
+  detail: UserActivityDetail;
+  range: AdminRange;
+}) {
+  const router = useRouter();
+  const heroAccentClass =
+    AVATAR_ACCENT_BG_CLASSES[accentIndexFor(detail.displayName)];
   const totalInteractions =
     detail.breakdown.habits +
     detail.breakdown.tasks +
@@ -44,18 +71,39 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
     detail.breakdown.chats +
     detail.breakdown.deepworkSessions +
     detail.breakdown.goals;
+  const rangeLabel = RANGE_LABELS[range].toLowerCase();
+
+  function updateRange(value: string) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("range", value);
+    router.push(`?${params.toString()}`);
+  }
 
   return (
     <div className="flex flex-col gap-6 px-4 pb-16 md:px-8">
+      <div className="flex justify-end">
+        <Select value={range} onValueChange={(v) => v && updateRange(v)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Range" />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RANGE_LABELS) as AdminRange[]).map((r) => (
+              <SelectItem key={r} value={r}>
+                {RANGE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex w-full max-w-2xl mx-auto flex-col items-center gap-6  p-8 text-center">
         <Avatar className="size-24 text-3xl">
           <AvatarImage
-            // alt={profile.displayName}
+            alt={detail.displayName}
             referrerPolicy="no-referrer"
-            // src={profile.avatarUrl ?? undefined}
+            src={detail.avatarUrl ?? undefined}
           />
-          <AvatarFallback className={cn("font-bold text-white")}>
-            {/* {initialsOf(profile.displayName)} */}
+          <AvatarFallback className={cn("font-bold text-white", heroAccentClass)}>
+            {initialsOf(detail.displayName)}
           </AvatarFallback>
         </Avatar>
 
@@ -80,7 +128,7 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
 
       <div>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-body-muted">
-          Interactions ({totalInteractions.toLocaleString()} total, lifetime)
+          Interactions ({totalInteractions.toLocaleString()} total, {rangeLabel})
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
           <Stat label="Habits" value={detail.breakdown.habits} />
@@ -97,7 +145,7 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
 
       <div>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-body-muted">
-          AI Talk token usage (lifetime)
+          AI Talk token usage ({rangeLabel})
         </h2>
         <div className="grid grid-cols-3 gap-3">
           <Stat
@@ -114,7 +162,7 @@ export function UserActivityClient({ detail }: { detail: UserActivityDetail }) {
 
       <div>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-body-muted">
-          Referred ({detail.referrals.length})
+          Referred ({detail.referrals.length}, {rangeLabel})
         </h2>
         {detail.referrals.length === 0 ? (
           <Empty className="rounded-2xl border border-line bg-paper py-8">

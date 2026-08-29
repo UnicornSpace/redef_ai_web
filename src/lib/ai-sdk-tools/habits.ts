@@ -430,3 +430,152 @@ export const logHabitNumberTool = tool({
     };
   },
 });
+
+export const createHabitTool = tool({
+  description:
+    "Create a brand-new habit to track. Do NOT call this the moment the " +
+    "user mentions wanting to build a habit — ask what you still need " +
+    "first, one or two questions at a time, the way you'd set one up for " +
+    "them in the app: what to call it, whether it's a simple yes/no habit, " +
+    "a checklist of steps, or a number to hit (e.g. glasses of water, " +
+    "pages read) — and for a number habit, the target and unit. Only skip " +
+    "a question if they already answered it in what they said. Defaults " +
+    "to starting today unless they say otherwise (e.g. \"starting Monday\").",
+  inputSchema: z.object({
+    name: z.string().describe("The habit's name, e.g. \"Morning run\""),
+    description: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Optional short note about the habit."),
+    type: z
+      .enum(["boolean", "checklist", "number"])
+      .default("boolean")
+      .describe(
+        "boolean = simple done/not-done. checklist = several sub-steps, " +
+          "done when all required ones are checked. number = a quantity " +
+          "against a goal (needs goalNumber).",
+      ),
+    startedAt: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("YYYY-MM-DD to start on. Omit to start today."),
+    endDate: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("YYYY-MM-DD to stop tracking, if the user gave one."),
+    targetPerWeek: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("How many days a week, if not every day (default 7)."),
+    checklistItems: z
+      .array(
+        z.object({
+          name: z.string(),
+          isOptional: z.boolean().optional(),
+        }),
+      )
+      .nullable()
+      .optional()
+      .describe("Only for type=\"checklist\" — the sub-steps, in order."),
+    goalComparator: z
+      .enum(["at_least", "less_than", "exactly"])
+      .nullable()
+      .optional()
+      .describe("Only for type=\"number\". Defaults to at_least."),
+    goalNumber: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Only for type=\"number\" — the target quantity. Required for that type."),
+    goalUnit: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Only for type=\"number\", e.g. \"glasses\", \"pages\", \"pushups\"."),
+    category: z.string().nullable().optional(),
+    priority: z
+      .enum(["high", "medium", "low"])
+      .nullable()
+      .optional()
+      .describe("Only if the user said this matters more/less than their other habits."),
+  }),
+  execute: async ({
+    name,
+    description,
+    type,
+    startedAt,
+    endDate,
+    targetPerWeek,
+    checklistItems,
+    goalComparator,
+    goalNumber,
+    goalUnit,
+    category,
+    priority,
+  }) => {
+    const supabase = await createClient();
+    const { data: user, error: authError } = await supabase.auth.getUser();
+    if (authError || !user?.user) {
+      return { error: authError?.message ?? "Not signed in" };
+    }
+
+    const trimmedName = name.trim();
+    if (!trimmedName) return { error: "Habit name is required" };
+    if (type === "number" && (goalNumber == null || Number.isNaN(goalNumber))) {
+      return { error: "A number habit needs a goal — ask the user for a target." };
+    }
+
+    const id = crypto.randomUUID();
+    const row: Record<string, unknown> = {
+      id,
+      name: trimmedName,
+      description: description?.trim() || null,
+      category: category?.trim() || null,
+      started_at: startedAt?.trim() || todayIso(),
+      end_date: endDate || null,
+      user_id: user.user.id,
+      // Same fallback used in the manual create-habit action — mirrored
+      // here rather than imported to keep this tool self-contained, same
+      // as every other tool in this file.
+      owner_display_name: user.user.email?.split("@")[0] ?? "Someone",
+      type,
+      target_per_week: targetPerWeek ?? 7,
+      goal_comparator: type === "number" ? (goalComparator ?? "at_least") : null,
+      goal_number: type === "number" ? goalNumber : null,
+      goal_unit: type === "number" ? goalUnit?.trim() || null : null,
+    };
+    if (priority !== undefined) row.priority = priority;
+
+    const { error } = await supabase.from("habits").insert(row);
+    if (error) return { error: error.message };
+
+    const items = (checklistItems ?? []).filter((i) => i.name.trim());
+    if (type === "checklist" && items.length > 0) {
+      const itemRows = items.map((item, index) => ({
+        id: crypto.randomUUID(),
+        habit_id: id,
+        name: item.name.trim(),
+        order_index: index + 1,
+        is_optional: item.isOptional ?? false,
+      }));
+      const { error: itemsError } = await supabase
+        .from("habit_checklist_items")
+        .insert(itemRows);
+      if (itemsError) {
+        return {
+          data: `Created "${trimmedName}", but the steps failed to save: ${itemsError.message}`,
+        };
+      }
+    }
+
+    return {
+      data: `Created "${trimmedName}" as a ${type} habit${
+        type === "number" ? ` (goal: ${goalNumber}${goalUnit ? ` ${goalUnit}` : ""})` : ""
+      }, starting ${row.started_at}.`,
+    };
+  },
+});

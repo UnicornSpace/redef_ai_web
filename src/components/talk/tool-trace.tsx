@@ -10,10 +10,12 @@ import {
   CircleCheckIcon,
   ClockIcon,
   FolderIcon,
+  HistoryIcon,
   KeyRoundIcon,
   ListTodoIcon,
   Loader2Icon,
   type LucideIcon,
+  PencilIcon,
   PlusIcon,
   ReceiptIcon,
   RepeatIcon,
@@ -69,6 +71,15 @@ const TOOL_META: Record<string, { label: string; Icon: LucideIcon }> = {
   },
   "tool-addTransaction": { label: "Logging a transaction", Icon: BanknoteIcon },
   "tool-updateMemory": { label: "Updating memory", Icon: BrainIcon },
+  "tool-createHabit": { label: "Setting up a new habit", Icon: PlusIcon },
+  "tool-listRecentDeepWorkSessions": {
+    label: "Looking up recent sessions",
+    Icon: HistoryIcon,
+  },
+  "tool-updateDeepWorkSession": {
+    label: "Correcting a session",
+    Icon: PencilIcon,
+  },
 };
 
 function isComplete(state: ToolUIPart["state"]): boolean {
