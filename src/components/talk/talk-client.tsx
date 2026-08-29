@@ -107,7 +107,7 @@ export function TalkClient({
   const visibleChats = chats.filter((c) => c.title);
 
   return (
-    <div className="relative flex max-w-4xl mx-auto flex-1 flex-col">
+    <div className="relative flex max-w-4xl  mx-auto flex-1  w-full flex-col">
       <div className="absolute top-4 right-4 z-10 flex gap-2 md:top-6 md:right-8">
         <Popover>
           <PopoverTrigger

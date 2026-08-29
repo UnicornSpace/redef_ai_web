@@ -1,4 +1,8 @@
-import { openai } from "@ai-sdk/openai";
+// OpenAI — commented out in favor of Amazon Bedrock below, not deleted so
+// switching back is a two-line change (this import + the `model:` line in
+// streamText further down).
+// import { openai } from "@ai-sdk/openai";
+import { bedrock } from "@ai-sdk/amazon-bedrock";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -19,7 +23,9 @@ import { updateWorkStandardsTool } from "@/lib/ai-sdk-tools/standards";
 import {
   getDeepWorkSummaryTool,
   listDeepWorkProjectsTool,
+  listRecentDeepWorkSessionsTool,
   logDeepWorkSessionsTool,
+  updateDeepWorkSessionTool,
 } from "@/lib/ai-sdk-tools/deepwork";
 import {
   addTransactionTool,
@@ -28,6 +34,7 @@ import {
 } from "@/lib/ai-sdk-tools/finance";
 import { getDayReviewTool } from "@/lib/ai-sdk-tools/day-review";
 import {
+  createHabitTool,
   listHabitsTool,
   logHabitNumberTool,
   toggleHabitChecklistItemTool,
@@ -44,6 +51,28 @@ import { createClient } from "@/lib/server";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
+
+/**
+ * By default toUIMessageStreamResponse() sends a generic "An error
+ * occurred." to the client for any mid-stream failure — with no feedback
+ * at all otherwise, a broken model call (wrong Bedrock model id, missing
+ * AWS credentials, model access not enabled, throttling) looked exactly
+ * like the assistant silently doing nothing. The real error message is
+ * safe to show here (this only ever reaches the authenticated owner of
+ * this chat, the same trust boundary as the realtime voice error surfaces
+ * on the other side of this feature), and is what makes the failure
+ * something the user can actually act on instead of just re-typing the
+ * same message into the void.
+ */
+function formatChatError(error: unknown): string {
+  // Logged server-side too — the client only gets the message text, not
+  // the stack/cause, and this is the one place a Bedrock misconfiguration
+  // (bad model id, no model access, missing credentials) would otherwise
+  // go completely unlogged.
+  console.error("[chat] streamText error:", error);
+  const message = error instanceof Error ? error.message : String(error);
+  return message ? message.slice(0, 400) : "Something went wrong generating a response.";
+}
 
 export async function POST(req: Request) {
   const { messages, chatId }: { messages: UIMessage[]; chatId?: string } =
@@ -69,14 +98,18 @@ export async function POST(req: Request) {
     : null;
 
   const result = streamText({
-    // openai("gpt-4o") defaults to OpenAI's Responses API (stateful — it
-    // references stored `msg_...` items server-side). Our chat history
-    // is stored in Supabase and replayed from there, so those ids don't
-    // exist on OpenAI's side across environments/orgs and the API
-    // returns "Item not found." `openai.chat(...)` uses the stateless
-    // Chat Completions API which is what this app was on before the
-    // ai@7 upgrade, and it works cross-environment.
-    model: openai.chat("gpt-4o"),
+    // Was openai.chat("gpt-4o") — see the commented-out import above for
+    // why the stateless Chat Completions API specifically was used. Now on
+    // Amazon Bedrock instead; Bedrock's models are stateless per-request
+    // the same way, so that concern doesn't apply here. Needs
+    // AWS_REGION/AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in the
+    // environment (the provider reads them itself, same as the AWS SDK's
+    // default credential chain), and this exact model must be switched on
+    // under "Model access" in the Bedrock console for that region before
+    // it'll respond — swap the id below for any other Bedrock model
+    // without touching anything else in this file.
+    // model: bedrock("us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
+    model: bedrock("us.amazon.nova-pro-v1:0"),
     // convertToModelMessages became async in ai@7 — used to return
     // ModelMessage[] directly, now returns Promise<ModelMessage[]>.
     messages: await convertToModelMessages(messages),
@@ -123,6 +156,8 @@ export async function POST(req: Request) {
             listDeepWorkProjects: listDeepWorkProjectsTool,
             logDeepWorkSessions: logDeepWorkSessionsTool,
             getDeepWorkSummary: getDeepWorkSummaryTool,
+            listRecentDeepWorkSessions: listRecentDeepWorkSessionsTool,
+            updateDeepWorkSession: updateDeepWorkSessionTool,
           }
         : {}),
       ...(enabledModules.includes("habits")
@@ -131,6 +166,7 @@ export async function POST(req: Request) {
             toggleHabitToday: toggleHabitTodayTool,
             toggleHabitChecklistItem: toggleHabitChecklistItemTool,
             logHabitNumber: logHabitNumberTool,
+            createHabit: createHabitTool,
           }
         : {}),
       ...(enabledModules.includes("personal_finance")
@@ -149,6 +185,9 @@ export async function POST(req: Request) {
     // the chat UI already renders a Reasoning block if one shows up, so
     // switching to a reasoning-capable model later needs no other change.
     sendReasoning: true,
+    // Without this, a failed model call reached the client as a bare
+    // generic error with no detail at all — see formatChatError above.
+    onError: formatChatError,
     onFinish: async ({ messages: finalMessages }) => {
       if (chatId) {
         await saveChatMessages(chatId, finalMessages);

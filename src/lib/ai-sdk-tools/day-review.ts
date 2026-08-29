@@ -2,6 +2,7 @@ import { tool } from "ai";
 import z from "zod";
 import { DEFAULT_ENABLED_MODULES, type ModuleKey } from "@/lib/modules";
 import { createClient } from "@/lib/server";
+import { isShoppingTask } from "@/lib/tasks";
 
 /**
  * One-shot snapshot of a single day across every module the user has on —
@@ -207,25 +208,44 @@ async function loadHabits(supabase: Supa, userId: string, date: string) {
 async function loadTasks(supabase: Supa, userId: string, date: string) {
   const { data } = await supabase
     .from("tasks")
-    .select("id, name, is_completed, updated_at, due_date")
+    .select("id, name, is_completed, updated_at, due_date, labels")
     .eq("user_id", userId)
     .eq("is_deleted", false);
-  const rows = data ?? [];
+  // Shopping items (labeled "Buy") aren't part of the day's to-do
+  // reckoning — they don't get mentioned in a recap or counted as
+  // open/overdue, same as they're excluded from getTasks.
+  const rows = (data ?? []).filter(
+    (t) => !isShoppingTask(t.labels as string[] | null),
+  );
   // updated_at is the closest thing to a completion timestamp this schema
   // has — same approximation reports.ts and activity.ts make.
   const completedToday = rows.filter(
     (t) => t.is_completed && String(t.updated_at).slice(0, 10) === date,
   );
   const open = rows.filter((t) => !t.is_completed);
+  // Relative to the date being reviewed (not necessarily today — a past
+  // day's recap should judge "overdue" against that day, not now) so the
+  // assistant can name a slipped commitment instead of just listing dates
+  // and leaving the arithmetic to it.
+  const openWithDueInfo = open.map((t) => {
+    const dueDate = (t.due_date as string | null) ?? null;
+    return {
+      id: t.id as string,
+      name: t.name as string,
+      dueDate,
+      isOverdue: dueDate != null && dueDate < date,
+      isDueToday: dueDate === date,
+    };
+  });
   return {
     completedCount: completedToday.length,
     completed: completedToday.map((t) => t.name as string),
     openCount: open.length,
-    open: open.slice(0, 10).map((t) => ({
-      id: t.id as string,
-      name: t.name as string,
-      dueDate: (t.due_date as string | null) ?? null,
-    })),
+    open: openWithDueInfo.slice(0, 10),
+    // Convenience rollups so a slipped commitment doesn't require scanning
+    // `open` — surface these yourself rather than waiting to be asked.
+    overdue: openWithDueInfo.filter((t) => t.isOverdue).map((t) => t.name),
+    dueToday: openWithDueInfo.filter((t) => t.isDueToday).map((t) => t.name),
   };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { play as playSound } from "cuelume";
+import type { ToolUIPart, UIMessage } from "ai";
 import { useCallback, useRef, useState } from "react";
 
 /**
@@ -30,6 +31,11 @@ export interface RealtimeTranscriptEntry {
   text: string;
 }
 
+export interface RealtimeCallUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 // Raw Realtime API protocol events over the data channel — a large,
 // evolving union upstream; narrowed locally to just the fields this hook
 // reads rather than modeling the whole protocol.
@@ -40,6 +46,14 @@ interface RealtimeEvent {
   arguments?: string;
   transcript?: string;
   error?: { message?: string };
+  // Present on response.done — token usage for that turn. Accumulated
+  // across every turn in the call into `callUsage` below.
+  response?: {
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+    };
+  };
 }
 
 // GA endpoint for the WebRTC SDP exchange. The preview-era URL was bare
@@ -137,6 +151,17 @@ export function useRealtimeVoice() {
   const [connectingMessage, setConnectingMessage] = useState<string>(
     CONNECTING_MESSAGES[0],
   );
+  // The call's turns, reshaped as real UIMessages (tagged
+  // metadata:{source:"voice"}) — appended live so the caller can merge them
+  // straight into the same chat history a text turn would produce, instead
+  // of the plain transcript[] above (which is only ever the single most
+  // recent line, for the small live caption under the call UI).
+  const [voiceMessages, setVoiceMessages] = useState<UIMessage[]>([]);
+  const [callUsage, setCallUsage] = useState<RealtimeCallUsage | null>(null);
+  // Mirrors callUsage for stop() (a stable useCallback) to read the latest
+  // value without depending on callUsage itself, same reasoning as
+  // statusRef/setStatusBoth above.
+  const callUsageRef = useRef<RealtimeCallUsage | null>(null);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -268,9 +293,49 @@ export function useRealtimeVoice() {
     // in flight — calling stop() on an already-idle hook (StrictMode
     // double-invoke, a stray click) should stay silent.
     if (statusRef.current !== "idle") playSound("droplet");
+    // Only a call that actually connected accumulates usage (a
+    // failed-to-connect attempt never sees a response.done), so this
+    // naturally skips the summary for a call that never really started.
+    if (callUsageRef.current) {
+      setVoiceMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          parts: [{ type: "text", text: "Call ended" }],
+          metadata: {
+            source: "voice",
+            kind: "call-summary",
+            usage: callUsageRef.current,
+          },
+        },
+      ]);
+    }
     cleanup();
     setStatusBoth("idle");
   }, [cleanup, setStatusBoth]);
+
+  /**
+   * Appends one turn to `voiceMessages` as a real UIMessage — same shape a
+   * text-chat turn ends up in, so the caller can splice it straight into
+   * the chat's existing messages array and it renders through the exact
+   * same Message/ToolTrace/renderToolOutput pipeline, live tool calls
+   * included, with zero bespoke rendering for the voice path.
+   */
+  function pushVoiceMessage(
+    role: "user" | "assistant",
+    parts: UIMessage["parts"],
+  ) {
+    setVoiceMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role,
+        parts,
+        metadata: { source: "voice" },
+      },
+    ]);
+  }
 
   async function runOneCall(call: {
     callId: string;
@@ -296,6 +361,25 @@ export function useRealtimeVoice() {
     } catch (err) {
       output = { error: err instanceof Error ? err.message : "Tool call failed" };
     }
+
+    // Surface the call in the visible chat the moment it resolves — this
+    // is the "add this thing" action actually showing up live, not just
+    // happening silently in the background. Reuses the identical
+    // tool-<name> part shape the text chat's tool calls already produce,
+    // so ToolTrace and the 4 tools with rich widgets (getTasks, etc.)
+    // render it exactly as they would for a typed turn. The dynamic tool
+    // name can't line up with ToolUIPart's generic TOOLS type at compile
+    // time (that union is fixed per-call-site elsewhere in the app), so
+    // this is an intentional cast, same as realtime-tools.ts's registry.
+    pushVoiceMessage("assistant", [
+      {
+        type: `tool-${call.name}`,
+        toolCallId: call.callId,
+        state: "output-available",
+        input: parsedArgs,
+        output,
+      } as ToolUIPart,
+    ]);
 
     const dc = dcRef.current;
     if (!dc || dc.readyState !== "open") return;
@@ -349,26 +433,42 @@ export function useRealtimeVoice() {
       case "response.done":
         activeResponseRef.current = false;
         setIsAssistantSpeaking(false);
+        // Accumulated (not replaced) — a single call is usually several
+        // response.done turns, and the caller wants the whole call's total
+        // when it ends, not just the last turn's.
+        if (event.response?.usage) {
+          const { input_tokens, output_tokens } = event.response.usage;
+          if (input_tokens || output_tokens) {
+            setCallUsage((prev) => {
+              const next = {
+                inputTokens: (prev?.inputTokens ?? 0) + (input_tokens ?? 0),
+                outputTokens: (prev?.outputTokens ?? 0) + (output_tokens ?? 0),
+              };
+              callUsageRef.current = next;
+              return next;
+            });
+          }
+        }
         // The turn is over, so every function call it was going to make
         // has now arrived — safe to run them and ask for one follow-up.
         void flushPendingCalls();
         break;
-      case "conversation.item.input_audio_transcription.completed":
-        if (event.transcript?.trim()) {
-          setTranscript((prev) => [
-            ...prev,
-            { role: "user", text: event.transcript?.trim() ?? "" },
-          ]);
+      case "conversation.item.input_audio_transcription.completed": {
+        const text = event.transcript?.trim();
+        if (text) {
+          setTranscript((prev) => [...prev, { role: "user", text }]);
+          pushVoiceMessage("user", [{ type: "text", text }]);
         }
         break;
-      case "response.audio_transcript.done":
-        if (event.transcript?.trim()) {
-          setTranscript((prev) => [
-            ...prev,
-            { role: "assistant", text: event.transcript?.trim() ?? "" },
-          ]);
+      }
+      case "response.audio_transcript.done": {
+        const text = event.transcript?.trim();
+        if (text) {
+          setTranscript((prev) => [...prev, { role: "assistant", text }]);
+          pushVoiceMessage("assistant", [{ type: "text", text }]);
         }
         break;
+      }
       case "response.function_call_arguments.done":
         // Buffer only — executing here (one `response.create` per call)
         // is what produced the "active response in progress" error on any
@@ -395,6 +495,9 @@ export function useRealtimeVoice() {
     setStatusBoth("connecting");
     playSound("loading");
     setTranscript([]);
+    setVoiceMessages([]);
+    setCallUsage(null);
+    callUsageRef.current = null;
 
     // Rotating "still working on it" copy + a soft repeating tick — both
     // stopped by stopConnectFeedback() the moment the call either connects
@@ -591,6 +694,8 @@ export function useRealtimeVoice() {
     assistantVolume,
     connectingMessage,
     transcript,
+    voiceMessages,
+    callUsage,
     error,
     start,
     stop,

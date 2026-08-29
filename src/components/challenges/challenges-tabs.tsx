@@ -20,15 +20,17 @@ export function ChallengesTabs({
   challengesSlot: ReactNode;
   leaderboardSlot: ReactNode;
 }) {
-  const [tab, setTab] = useState<Tab>("challenges");
+  // Leaderboard leads — seeing where you rank is the higher-priority
+  // glance than browsing the challenge catalog.
+  const [tab, setTab] = useState<Tab>("leaderboard");
 
   return (
     <div className="flex flex-col gap-2">
       <div className="px-4 pt-6 md:px-8">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList>
-            <TabsTab value="challenges">Challenges</TabsTab>
             <TabsTab value="leaderboard">Leaderboard</TabsTab>
+            <TabsTab value="challenges">Challenges</TabsTab>
           </TabsList>
         </Tabs>
       </div>

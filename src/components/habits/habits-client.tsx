@@ -2,13 +2,14 @@
 
 import { Check, Copy, Flame, MoreVertical, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   addChecklistItem,
   createHabit,
   deleteChecklistItem,
   deleteHabit,
+  type HabitRangeCompletions,
   logNumericValue,
   removeHabitParent,
   setHabitParent,
@@ -1553,6 +1554,34 @@ export function HabitsClient({
   const [, startTransition] = useTransition();
   const router = useRouter();
 
+  // Owned here (not inside FocusView) so a number logged against a
+  // non-today date from the desktop matrix can be patched optimistically
+  // the same way every other habit field on this page already is.
+  const [rangeCompletions, setRangeCompletions] =
+    useState<HabitRangeCompletions>({});
+  // Tracks the Focus view's desktop-matrix selected date, purely so the
+  // Add-habit dialog can default its start date to it.
+  const [focusSelectedDate, setFocusSelectedDate] = useState(() =>
+    dateKey(new Date()),
+  );
+  // Empty deps is correct — this only closes over the functional-updater
+  // form of setState, so it never needs to change identity. It MUST stay
+  // stable: FocusView re-runs its range fetch whenever this reference
+  // changes, and this component re-renders on every optimistic habit
+  // toggle anywhere on the page.
+  const handleRangeCompletionsLoaded = useCallback(
+    (patch: HabitRangeCompletions) => {
+      setRangeCompletions((prev) => {
+        const merged: HabitRangeCompletions = { ...prev };
+        for (const [habitId, byDate] of Object.entries(patch)) {
+          merged[habitId] = { ...(merged[habitId] ?? {}), ...byDate };
+        }
+        return merged;
+      });
+    },
+    [],
+  );
+
   function resetForm() {
     setType("boolean");
     setName("");
@@ -1746,36 +1775,71 @@ export function HabitsClient({
   function handleToggleChecklistItemFromFocus(
     habitId: string,
     itemId: string,
+    dateKey: string,
   ) {
     const todayKey = todayDateKey();
+    const isToday = dateKey === todayKey;
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return;
-    const currentItems = habit.todayCompletedItemIds ?? [];
     const currentDates = habit.completed_dates ?? [];
+    // A past date has no per-day field on the habit object the way
+    // todayCompletedItemIds does — optimistically patched into
+    // rangeCompletions instead, same pattern as handleLogNumberFromFocus.
+    const previousRangeDetail = rangeCompletions[habitId]?.[dateKey];
+    const currentItems = isToday
+      ? (habit.todayCompletedItemIds ?? [])
+      : (previousRangeDetail?.completedItemIds ?? []);
     const nextItems = currentItems.includes(itemId)
       ? currentItems.filter((x) => x !== itemId)
       : [...currentItems, itemId];
-    handleUpdated(habitId, { todayCompletedItemIds: nextItems });
+
+    if (isToday) {
+      handleUpdated(habitId, { todayCompletedItemIds: nextItems });
+    } else {
+      setRangeCompletions((prev) => ({
+        ...prev,
+        [habitId]: {
+          ...(prev[habitId] ?? {}),
+          [dateKey]: {
+            completedItemIds: nextItems,
+            numericValue: previousRangeDetail?.numericValue ?? null,
+          },
+        },
+      }));
+    }
 
     startTransition(async () => {
-      const res = await toggleChecklistItem(habitId, todayKey, itemId);
+      const res = await toggleChecklistItem(habitId, dateKey, itemId);
       if (res.error) {
-        handleUpdated(habitId, { todayCompletedItemIds: currentItems });
+        if (isToday) {
+          handleUpdated(habitId, { todayCompletedItemIds: currentItems });
+        } else {
+          setRangeCompletions((prev) => ({
+            ...prev,
+            [habitId]: {
+              ...(prev[habitId] ?? {}),
+              [dateKey]: previousRangeDetail ?? {
+                completedItemIds: [],
+                numericValue: null,
+              },
+            },
+          }));
+        }
         toast.error(res.error);
         return;
       }
       // Server tells us whether required-items threshold is now met,
-      // which flips `completed_dates` for today. Reconcile that here so
-      // FocusView's "done today" split immediately reflects it.
+      // which flips `completed_dates` for that day. Reconcile that here
+      // so FocusView's "done" split immediately reflects it.
       if (res.dayComplete !== undefined) {
-        const hasToday = currentDates.includes(todayKey);
-        if (res.dayComplete && !hasToday) {
+        const hasDate = currentDates.includes(dateKey);
+        if (res.dayComplete && !hasDate) {
           handleUpdated(habitId, {
-            completed_dates: [...currentDates, todayKey],
+            completed_dates: [...currentDates, dateKey],
           });
-        } else if (!res.dayComplete && hasToday) {
+        } else if (!res.dayComplete && hasDate) {
           handleUpdated(habitId, {
-            completed_dates: currentDates.filter((d) => d !== todayKey),
+            completed_dates: currentDates.filter((d) => d !== dateKey),
           });
         }
       }
@@ -1784,36 +1848,64 @@ export function HabitsClient({
 
   function handleLogNumberFromFocus(
     habitId: string,
-    dateKey: string,
+    logDateKey: string,
     value: number,
   ) {
     const todayKey = todayDateKey();
-    const isToday = dateKey === todayKey;
+    const isToday = logDateKey === todayKey;
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return;
     const previousValue = habit.todayNumericValue ?? null;
     const previousDates = habit.completed_dates ?? [];
-    // todayNumericValue only ever represents "today" in the client state
-    // shape — logging a past date doesn't touch it, since there's no
-    // per-past-date field to update it into.
-    if (isToday) handleUpdated(habitId, { todayNumericValue: value });
+    // A past date has no per-day field on the habit object the way
+    // todayNumericValue does — it's optimistically patched into
+    // rangeCompletions instead, which is what the desktop week matrix and
+    // the left panel both read for any non-today selected date.
+    const previousRangeDetail = rangeCompletions[habitId]?.[logDateKey];
+    if (isToday) {
+      handleUpdated(habitId, { todayNumericValue: value });
+    } else {
+      setRangeCompletions((prev) => ({
+        ...prev,
+        [habitId]: {
+          ...(prev[habitId] ?? {}),
+          [logDateKey]: {
+            completedItemIds: previousRangeDetail?.completedItemIds ?? [],
+            numericValue: value,
+          },
+        },
+      }));
+    }
 
     startTransition(async () => {
-      const res = await logNumericValue(habitId, dateKey, value);
+      const res = await logNumericValue(habitId, logDateKey, value);
       if (res.error) {
-        if (isToday) handleUpdated(habitId, { todayNumericValue: previousValue });
+        if (isToday) {
+          handleUpdated(habitId, { todayNumericValue: previousValue });
+        } else {
+          setRangeCompletions((prev) => ({
+            ...prev,
+            [habitId]: {
+              ...(prev[habitId] ?? {}),
+              [logDateKey]: previousRangeDetail ?? {
+                completedItemIds: [],
+                numericValue: null,
+              },
+            },
+          }));
+        }
         toast.error(res.error);
         return;
       }
       if (res.dayComplete !== undefined) {
-        const hasDate = previousDates.includes(dateKey);
+        const hasDate = previousDates.includes(logDateKey);
         if (res.dayComplete && !hasDate) {
           handleUpdated(habitId, {
-            completed_dates: [...previousDates, dateKey],
+            completed_dates: [...previousDates, logDateKey],
           });
         } else if (!res.dayComplete && hasDate) {
           handleUpdated(habitId, {
-            completed_dates: previousDates.filter((d) => d !== dateKey),
+            completed_dates: previousDates.filter((d) => d !== logDateKey),
           });
         }
       }
@@ -1895,7 +1987,19 @@ export function HabitsClient({
           open={open}
           onOpenChange={(next) => {
             setOpen(next);
-            if (!next) resetForm();
+            if (next) {
+              // Opened from the Focus layout — default the new habit's
+              // start date to whatever day is focused there, so it's in
+              // sync with the day being browsed instead of always today.
+              // The mobile FAB's setOpen(true) call bypasses onOpenChange
+              // entirely, so that entry point is unaffected and keeps
+              // defaulting to today.
+              setStartedAt(
+                layoutMode === "focus" ? focusSelectedDate : dateKey(new Date()),
+              );
+            } else {
+              resetForm();
+            }
           }}
         >
           <ResponsiveDialogTrigger
@@ -2138,6 +2242,9 @@ export function HabitsClient({
           onToggleHabitOnDate={handleToggleHabitOnDateFromFocus}
           onToggleChecklistItem={handleToggleChecklistItemFromFocus}
           onLogNumber={handleLogNumberFromFocus}
+          rangeCompletions={rangeCompletions}
+          onRangeCompletionsLoaded={handleRangeCompletionsLoaded}
+          onSelectedDateChange={setFocusSelectedDate}
         />
       ) : (
         // CSS multi-column masonry — plain grid left tall/short cards next

@@ -674,6 +674,57 @@ export async function getHabitCompletionForDate(
   };
 }
 
+export type HabitCompletionDetail = {
+  completedItemIds: string[];
+  numericValue: number | null;
+};
+
+// habitId -> completion_date ("YYYY-MM-DD") -> that day's detail. A date
+// with no entry means no completion row exists for it (nothing logged).
+export type HabitRangeCompletions = Record<
+  string,
+  Record<string, HabitCompletionDetail>
+>;
+
+/**
+ * Batched version of getHabitCompletionForDate for a whole date range
+ * across many habits in one round trip — the Focus view's desktop week
+ * matrix needs every visible day's numeric/checklist detail (not just
+ * today's, which listHabits already bulk-loads) to render a proportional
+ * fill instead of a binary done/not-done square, and doing that one day
+ * and one habit at a time would be an N+1 fetch per page of the matrix.
+ */
+export async function getHabitCompletionsForRange(
+  habitIds: string[],
+  startDate: string,
+  endDate: string,
+): Promise<HabitRangeCompletions> {
+  if (habitIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return {};
+
+  const { data, error } = await supabase
+    .from("habit_completions")
+    .select("habit_id, completion_date, completed_item_ids, numeric_value")
+    .eq("user_id", user.user.id)
+    .in("habit_id", habitIds)
+    .gte("completion_date", startDate)
+    .lte("completion_date", endDate);
+  if (error) throw new Error(error.message);
+
+  const result: HabitRangeCompletions = {};
+  for (const row of data ?? []) {
+    result[row.habit_id] ??= {};
+    result[row.habit_id][row.completion_date] = {
+      completedItemIds: row.completed_item_ids ?? [],
+      numericValue: row.numeric_value ?? null,
+    };
+  }
+  return result;
+}
+
 export async function toggleHabitDate(
   habitId: string,
   date: string,

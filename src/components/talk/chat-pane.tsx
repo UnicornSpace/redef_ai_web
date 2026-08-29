@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type ToolUIPart, type UIMessage } from "ai";
 import { play as playSound } from "cuelume";
 import {
+  ChevronDownIcon,
   CopyIcon,
   Loader2Icon,
   MicIcon,
@@ -13,6 +14,7 @@ import {
   PlayIcon,
   RefreshCcwIcon,
   SquareIcon,
+  TriangleAlertIcon,
   Volume2Icon,
   VolumeXIcon,
 } from "lucide-react";
@@ -42,6 +44,7 @@ import {
   FaTasks,
 } from "react-icons/fa";
 import { toast } from "sonner";
+import { saveChatMessages } from "@/actions/chat";
 import { useSetNavHidden } from "@/components/app-shell/mobile-fab-context";
 import { Action, Actions } from "@/components/ai-elements/actions";
 import {
@@ -68,6 +71,12 @@ import {
 import { Response } from "@/components/ai-elements/response";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { TextShimmer } from "../text-shimmer";
 import { AudioLinesIcon, AudioLinesIconHandle } from "../ui/audio-lines";
@@ -321,7 +330,7 @@ export function ChatPane({
     oldestLoadedIndexRef.current = oldestLoadedIndex;
   }, [oldestLoadedIndex]);
 
-  const { messages, sendMessage, status, stop, regenerate, setMessages } =
+  const { messages, sendMessage, status, error, stop, regenerate, setMessages } =
     useChat({
       id: chatId,
       messages: initialWindow,
@@ -329,7 +338,40 @@ export function ChatPane({
         api: "/api/chat",
         body: { chatId },
       }),
+      // Without this the model failing (bad request, provider outage, a
+      // Bedrock misconfiguration) looked identical to it doing nothing —
+      // no toast, no message, nothing for the user to act on. `error` +
+      // `status === "error"` below render the actual message inline in
+      // the chat too, not just this toast.
+      onError: (err) => toast.error(err.message || "Couldn't get a response."),
     });
+
+  // Splices live voice-call turns into this SAME chat thread as they
+  // arrive, so a voice call is just another way of adding to one
+  // conversation rather than a separate, throwaway transcript. Persisted
+  // through the exact saveChatMessages() the text route's onFinish already
+  // uses — the voice call has no server route of its own to hook onFinish
+  // into, so this is the client-side equivalent, called after every new
+  // turn rather than once per streamed response.
+  const mergedVoiceCountRef = useRef(0);
+  useEffect(() => {
+    const all = realtimeVoice.voiceMessages;
+    // A new call starting resets voiceMessages back to [] — detected here
+    // (rather than reading realtimeVoice.status) so this doesn't need
+    // that as a dependency, and re-syncs the count so the next call's
+    // turns aren't skipped as if they were already merged.
+    if (all.length < mergedVoiceCountRef.current) {
+      mergedVoiceCountRef.current = 0;
+    }
+    const newOnes = all.slice(mergedVoiceCountRef.current);
+    if (newOnes.length === 0) return;
+    mergedVoiceCountRef.current = all.length;
+    setMessages((prev) => {
+      const next = [...prev, ...newOnes];
+      void saveChatMessages(chatId, next);
+      return next;
+    });
+  }, [realtimeVoice.voiceMessages, chatId, setMessages]);
 
   const loadOlderMessages = useCallback(() => {
     if (isLoadingOlderRef.current) return;
@@ -656,6 +698,42 @@ export function ChatPane({
             </div>
           ) : null}
           {messages.map((message, mi) => {
+            const voiceMeta = message.metadata as
+              | {
+                  source?: string;
+                  kind?: string;
+                  usage?: { inputTokens: number; outputTokens: number };
+                }
+              | undefined;
+            const isVoiceMessage = voiceMeta?.source === "voice";
+
+            if (voiceMeta?.kind === "call-summary") {
+              const usage = voiceMeta.usage;
+              return (
+                <Collapsible
+                  key={mi}
+                  className="my-2 flex justify-center"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-body-muted hover:text-ink">
+                      <PhoneOffIcon className="size-3" />
+                      Call ended
+                      <ChevronDownIcon className="size-3" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <p className="text-[11px] text-body-muted">
+                        {usage
+                          ? `${usage.inputTokens} in · ${usage.outputTokens} out · ${
+                              usage.inputTokens + usage.outputTokens
+                            } tokens total`
+                          : "No usage recorded for this call."}
+                      </p>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            }
+
             const isLastMessage = mi === messages.length - 1;
             // Every tool call for this message collapses into ONE trace —
             // never a stack of separate "Working on it" parents, even when
@@ -691,6 +769,15 @@ export function ChatPane({
                             variant="contained"
                             className="text-base text-ink md:text-lg rounded-sm"
                           >
+                            {isVoiceMessage ? (
+                              <span
+                                className="mb-1 flex items-center gap-1 text-[11px] font-medium opacity-70"
+                                title="Said during a voice call"
+                              >
+                                <MicIcon className="size-3" />
+                                Voice
+                              </span>
+                            ) : null}
                             <Response className="">{part.text}</Response>
                           </MessageContent>
                         </Message>
@@ -771,6 +858,25 @@ export function ChatPane({
                 </TextShimmer>
               </MessageContent>
             </Message>
+          ) : null}
+          {status === "error" ? (
+            <div className="mx-1 flex flex-col gap-2 rounded-xl border border-rf-coral/30 bg-rf-coral/5 px-4 py-3">
+              <div className="flex items-start gap-2 text-sm text-rf-coral">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  {error?.message || "Something went wrong generating a response."}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-fit"
+                onClick={() => regenerate()}
+              >
+                <RefreshCcwIcon className="size-3.5" />
+                Try again
+              </Button>
+            </div>
           ) : null}
         </ConversationContent>
         <ConversationScrollButton />

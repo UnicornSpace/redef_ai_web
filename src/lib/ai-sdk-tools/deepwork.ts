@@ -308,3 +308,130 @@ export const getDeepWorkSummaryTool = tool({
 // old single-session name. Alias to the new bulk tool so existing wire-up
 // doesn't break until the route is updated in the same commit.
 export const logDeepWorkSessionTool = logDeepWorkSessionsTool;
+
+export const listRecentDeepWorkSessionsTool = tool({
+  description:
+    "List the user's most recently logged deep-work sessions (most recent " +
+    "first), with each session's id, project, start/end time, and " +
+    "duration. Call this BEFORE updateDeepWorkSession whenever the user " +
+    "wants to correct or change a session they already logged (\"that " +
+    "should've ended at 3\", \"put the morning one on the wrong project\") " +
+    "so you can find the right sessionId — never guess one.",
+  inputSchema: z.object({
+    limit: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("How many to return, most recent first. Defaults to 10."),
+  }),
+  execute: async ({ limit }) => {
+    const supabase = await createClient();
+    const { data: user, error: authError } = await supabase.auth.getUser();
+    if (authError || !user.user) {
+      return { error: authError?.message ?? "Not signed in" };
+    }
+
+    const { data, error } = await supabase
+      .from("deepwork_sessions")
+      .select("id, start_time, end_time, duration_in_minutes, project:projects(id, name)")
+      .eq("user_id", user.user.id)
+      .eq("is_deleted", false)
+      .order("start_time", { ascending: false })
+      .limit(limit ?? 10);
+    if (error) return { error: error.message };
+
+    return {
+      data: {
+        sessions: (data ?? []).map((s) => {
+          // Supabase infers a to-many array shape for this join even
+          // though it's really to-one — same cast-through-unknown
+          // listSessions() (src/actions/deepwork.ts) already needs for
+          // the identical `project:projects(id, name)` join.
+          const project = s.project as unknown as {
+            id: string;
+            name: string;
+          } | null;
+          return {
+            id: s.id as string,
+            startTime: s.start_time as string,
+            endTime: s.end_time as string,
+            durationMinutes: s.duration_in_minutes as number,
+            project: project?.name ?? null,
+            projectId: project?.id ?? null,
+          };
+        }),
+      },
+    };
+  },
+});
+
+export const updateDeepWorkSessionTool = tool({
+  description:
+    "Correct a deep-work session that's already been logged — its start " +
+    "time, end time, and/or which project it's linked to. Get the " +
+    "sessionId from listRecentDeepWorkSessions first; never invent one. " +
+    "Only pass the field(s) that actually changed — anything omitted " +
+    "keeps its current value.",
+  inputSchema: z.object({
+    sessionId: z.string().describe("From listRecentDeepWorkSessions"),
+    startTime: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("New ISO 8601 start time, only if it changed."),
+    endTime: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("New ISO 8601 end time, only if it changed."),
+    projectId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        "New project id from listDeepWorkProjects, only if it changed. " +
+          "Pass null to unlink the project entirely.",
+      ),
+  }),
+  execute: async ({ sessionId, startTime, endTime, projectId }) => {
+    const supabase = await createClient();
+    const { data: user, error: authError } = await supabase.auth.getUser();
+    if (authError || !user.user) {
+      return { error: authError?.message ?? "Not signed in" };
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("deepwork_sessions")
+      .select("start_time, end_time, project_id")
+      .eq("id", sessionId)
+      .eq("user_id", user.user.id)
+      .maybeSingle();
+    if (fetchError || !existing) {
+      return { error: fetchError?.message ?? "Session not found" };
+    }
+
+    const start = new Date(startTime ?? existing.start_time);
+    const end = new Date(endTime ?? existing.end_time);
+    const durationSeconds = Math.round((end.getTime() - start.getTime()) / 1000);
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      return { error: "Session end must be after the start" };
+    }
+
+    const { error } = await supabase
+      .from("deepwork_sessions")
+      .update({
+        project_id: projectId !== undefined ? projectId : existing.project_id,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        duration_in_minutes: Math.round(durationSeconds / 60),
+        duration_in_seconds: durationSeconds,
+      })
+      .eq("id", sessionId)
+      .eq("user_id", user.user.id);
+    if (error) return { error: error.message };
+
+    return {
+      data: `Updated the session — now ${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} (${Math.round(durationSeconds / 60)} min).`,
+    };
+  },
+});

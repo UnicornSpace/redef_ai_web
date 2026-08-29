@@ -1,6 +1,14 @@
 "use server";
 
 import { createAdminClient } from "@/lib/admin";
+import {
+  computeDeepWorkAchievements,
+  computeHabitStreakAchievements,
+  computeReferralAchievements,
+  computeTaskAchievements,
+  type Achievement,
+} from "@/lib/achievements";
+import { referralCodeForUserId } from "@/lib/referral";
 import { createClient } from "@/lib/server";
 
 export interface ActivityHeatmapPoint {
@@ -150,4 +158,70 @@ export async function getPublicActivityHeatmap(username: string): Promise<{
     value,
   }));
   return { points, from, to };
+}
+
+/**
+ * Activity-based achievements for the public profile page — referrals,
+ * completed tasks, best habit streak, and total deep-work hours. Gated on
+ * the same `public_activity_visible` opt-out as getPublicActivityHeatmap
+ * (these reveal more than tenure does, so they get the same privacy
+ * treatment); returns [] rather than throwing when the flag is off, so the
+ * page just doesn't render this section instead of erroring.
+ */
+export async function getPublicActivityAchievements(
+  username: string,
+): Promise<Achievement[]> {
+  const admin = createAdminClient();
+  const normalized = username.trim().toLowerCase();
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("user_id, public_activity_visible")
+    .eq("username", normalized)
+    .maybeSingle();
+  if (!profile) return [];
+  if (profile.public_activity_visible === false) return [];
+  const userId = profile.user_id;
+
+  const [referralsRes, tasksRes, habitsRes, deepWorkRes] = await Promise.all([
+    admin
+      .from("user_preferences")
+      .select("user_id", { count: "exact", head: true })
+      .eq("referred_by", referralCodeForUserId(userId)),
+    admin
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_deleted", false)
+      .eq("is_completed", true),
+    admin
+      .from("habits")
+      .select("best_streak")
+      .eq("user_id", userId)
+      .eq("is_deleted", false),
+    admin
+      .from("deepwork_sessions")
+      .select("duration_in_seconds")
+      .eq("user_id", userId)
+      .eq("is_deleted", false),
+  ]);
+
+  const referralCount = referralsRes.count ?? 0;
+  const completedTaskCount = tasksRes.count ?? 0;
+  const bestStreak = (habitsRes.data ?? []).reduce(
+    (max, h) => Math.max(max, (h.best_streak as number | null) ?? 0),
+    0,
+  );
+  const totalDeepWorkHours =
+    (deepWorkRes.data ?? []).reduce(
+      (sum, s) => sum + ((s.duration_in_seconds as number | null) ?? 0),
+      0,
+    ) / 3600;
+
+  return [
+    ...computeReferralAchievements(referralCount),
+    ...computeTaskAchievements(completedTaskCount),
+    ...computeHabitStreakAchievements(bestStreak),
+    ...computeDeepWorkAchievements(totalDeepWorkHours),
+  ];
 }

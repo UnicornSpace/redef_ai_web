@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
-import { getPublicActivityHeatmap } from "@/actions/activity";
+import {
+  getPublicActivityAchievements,
+  getPublicActivityHeatmap,
+} from "@/actions/activity";
 import { getPublicProfile } from "@/actions/profile";
 import { ActivityHeatmap } from "@/components/activity/activity-heatmap";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,16 +21,22 @@ export default async function PublicProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const [profile, activity] = await Promise.all([
+  const [profile, activity, activityAchievements] = await Promise.all([
     getPublicProfile(username),
     // Returns null when the user opted out of public activity — the page
     // simply omits the heatmap section in that case rather than showing
     // an empty one, since "empty" would leak the fact they've been away.
     getPublicActivityHeatmap(username),
+    // Same opt-out as the heatmap — returns [] when the user isn't sharing
+    // activity, same as never having unlocked any of them.
+    getPublicActivityAchievements(username),
   ]);
   if (!profile) notFound();
 
-  const achievements = computeTenureAchievements(profile.memberSince);
+  const achievements = [
+    ...computeTenureAchievements(profile.memberSince),
+    ...activityAchievements,
+  ];
   const accentClass =
     AVATAR_ACCENT_BG_CLASSES[accentIndexFor(profile.displayName)];
   const memberSinceLabel = profile.memberSince

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { toggleTaskCompleted } from "@/actions/tasks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
+import { isShoppingTask } from "@/lib/tasks";
 import type { Task } from "@/lib/types/productivity";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ export function HomeTasksWidget({
   const filtered = useMemo(() => {
     return tasks
       .filter((t) => !!t.due_date)
+      .filter((t) => !isShoppingTask(t.labels))
       .filter((t) => {
         const due = t.due_date as string;
         return range === "today"

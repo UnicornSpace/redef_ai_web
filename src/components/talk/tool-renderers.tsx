@@ -50,7 +50,7 @@ function TaskList({ data }: { data: Data }) {
     | Array<{
         id: string;
         name: string;
-        category: string | null;
+        labels: string[];
         dueDate: string | null;
         isCompleted: boolean;
       }>
@@ -87,9 +87,16 @@ function TaskList({ data }: { data: Data }) {
             >
               {t.name}
             </span>
-            {t.category || t.dueDate ? (
-              <span className="flex flex-wrap gap-1.5 text-xs text-body-muted">
-                {t.category ? <span>{t.category}</span> : null}
+            {t.labels.length > 0 || t.dueDate ? (
+              <span className="flex flex-wrap items-center gap-1.5 text-xs text-body-muted">
+                {t.labels.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full bg-line px-1.5 py-0.5"
+                  >
+                    {label}
+                  </span>
+                ))}
                 {t.dueDate ? <span>· due {fmtDate(t.dueDate)}</span> : null}
               </span>
             ) : null}
