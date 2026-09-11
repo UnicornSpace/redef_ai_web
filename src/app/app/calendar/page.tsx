@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { listDayNotes } from "@/actions/day-notes";
 import { listSessions } from "@/actions/deepwork";
 import { listTransactions } from "@/actions/finance";
 import {
@@ -52,13 +53,14 @@ async function CalendarData() {
   const rangeEnd = new Date(now);
   rangeEnd.setDate(rangeEnd.getDate() + 60);
 
-  const [tasks, habits, sessions, transactions, googleConnected] =
+  const [tasks, habits, sessions, transactions, googleConnected, dayNotes] =
     await Promise.all([
       listTasks(),
       listHabits(),
       listSessions(500),
       listTransactions(),
       isGoogleCalendarConnected(),
+      listDayNotes(dateKey(rangeStart), dateKey(rangeEnd)),
     ]);
 
   const googleEvents = googleConnected
@@ -90,6 +92,8 @@ async function CalendarData() {
       financeCount: 0,
       workSeconds: 0,
       googleEvents: [],
+      note: null,
+      noteSource: null,
     };
     daySummaries[date] = created;
     return created;
@@ -125,6 +129,13 @@ async function CalendarData() {
   for (const s of sessions) {
     const key = dateKey(new Date(s.start_time));
     bucket(key).workSeconds += s.duration_in_seconds;
+  }
+  // A day with only a note still needs a bucket, so this runs through the
+  // same bucket() helper rather than patching existing entries.
+  for (const [date, note] of Object.entries(dayNotes)) {
+    const b = bucket(date);
+    b.note = note.content;
+    b.noteSource = note.source;
   }
   for (const ge of googleEvents) {
     if (!ge.start) continue;

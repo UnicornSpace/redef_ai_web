@@ -32,17 +32,11 @@ import { toast } from "sonner";
 import { connectGoogleCalendar } from "@/actions/google-calendar";
 import { toggleHabitDate } from "@/actions/habits";
 import { toggleTaskCompleted } from "@/actions/tasks";
+import { DayNoteSection } from "@/components/calendar/day-note-section";
 import { LucideCalendarFold } from "@/components/icons/lucide-calendar-fold";
 import { TdesignComponentSteps1 } from "@/components/icons/tdesign-component-steps-1";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ResponsiveDialog,
-  ResponsiveDialogContent,
-  ResponsiveDialogHeader,
-  ResponsiveDialogPanel,
-  ResponsiveDialogTitle,
-} from "@/components/ui/responsive-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +56,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogPanel,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type {
   CalendarEvent,
@@ -129,11 +130,7 @@ const MAX_PILLS_PER_DAY = 3;
  * Google events are already surfaced as event pills higher up in the
  * cell, so no separate indicator here for them (that'd be double-counting).
  */
-function DayCellSummary({
-  summary,
-}: {
-  summary: DaySummary | undefined;
-}) {
+function DayCellSummary({ summary }: { summary: DaySummary | undefined }) {
   if (!summary) return null;
   const habitsTotal = summary.habits.length;
   const habitsDone = summary.habits.filter((h) => h.done).length;
@@ -436,7 +433,7 @@ function AgendaView({ events }: { events: CalendarEvent[] }) {
                       event.completed && "text-body-muted line-through",
                     )}
                   >
-                    {event.title} 
+                    {event.title}
                   </span>
                 </Link>
               ))}
@@ -480,10 +477,14 @@ export function CalendarClient({
   // Nav semantics: step by month in month view, by week in week view. In
   // agenda view the header hides the nav entirely (nothing to page).
   function stepPrev() {
-    setFocusDate((d) => (viewMode === "week" ? subWeeks(d, 1) : subMonths(d, 1)));
+    setFocusDate((d) =>
+      viewMode === "week" ? subWeeks(d, 1) : subMonths(d, 1),
+    );
   }
   function stepNext() {
-    setFocusDate((d) => (viewMode === "week" ? addWeeks(d, 1) : addMonths(d, 1)));
+    setFocusDate((d) =>
+      viewMode === "week" ? addWeeks(d, 1) : addMonths(d, 1),
+    );
   }
 
   // Label shown between the prev/next buttons. Week view shows the actual
@@ -502,7 +503,9 @@ export function CalendarClient({
         ? `${format(start, "MMM d")}–${format(end, "MMM d")}`
         : `${format(start, "MMM d")} – ${format(end, "MMM d")}`;
     }
-    return compact ? format(focusDate, "MMM yyyy") : format(focusDate, "MMMM yyyy");
+    return compact
+      ? format(focusDate, "MMM yyyy")
+      : format(focusDate, "MMMM yyyy");
   }
 
   return (
@@ -547,7 +550,9 @@ export function CalendarClient({
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+              aria-label={
+                viewMode === "week" ? "Previous week" : "Previous month"
+              }
               onClick={stepPrev}
             >
               <ChevronLeft />
@@ -583,7 +588,9 @@ export function CalendarClient({
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+              aria-label={
+                viewMode === "week" ? "Previous week" : "Previous month"
+              }
               onClick={stepPrev}
             >
               <ChevronLeft />
@@ -615,7 +622,9 @@ export function CalendarClient({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Calendar options"
-              className={cn(buttonVariants({ variant: "outline", size: "icon-sm" }))}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "icon-sm" }),
+              )}
             >
               <MoreVertical />
             </DropdownMenuTrigger>
@@ -751,9 +760,10 @@ function DayDetailDialog({
             summary.habits.length === 0 &&
             summary.financeCount === 0 &&
             summary.workSeconds === 0 &&
-            summary.googleEvents.length === 0) ? (
+            summary.googleEvents.length === 0 &&
+            !summary.note) ? (
             <p className="text-sm text-body-muted">
-              Nothing recorded for this day.
+              Nothing recorded for this day yet — add a note below.
             </p>
           ) : (
             <>
@@ -884,6 +894,19 @@ function DayDetailDialog({
               ) : null}
             </>
           )}
+
+          {/* Always available, even on an otherwise empty day — the note is
+              often the only reason to open a past day at all. `key` remounts
+              the editor when you move to another day so its draft never
+              carries across dates. */}
+          {date ? (
+            <DayNoteSection
+              key={date}
+              date={date}
+              initialContent={summary?.note ?? ""}
+              initialSource={summary?.noteSource ?? null}
+            />
+          ) : null}
         </ResponsiveDialogPanel>
       </ResponsiveDialogContent>
     </ResponsiveDialog>

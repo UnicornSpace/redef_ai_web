@@ -46,15 +46,16 @@ function fmtMoney(n: number): string {
 }
 
 function TaskList({ data }: { data: Data }) {
-  const tasks = (data?.tasks as
-    | Array<{
-        id: string;
-        name: string;
-        labels: string[];
-        dueDate: string | null;
-        isCompleted: boolean;
-      }>
-    | undefined) ?? [];
+  const tasks =
+    (data?.tasks as
+      | Array<{
+          id: string;
+          name: string;
+          labels: string[];
+          dueDate: string | null;
+          isCompleted: boolean;
+        }>
+      | undefined) ?? [];
   const filter = (data?.filter as string | undefined) ?? "open";
   if (tasks.length === 0) {
     return (
@@ -108,15 +109,16 @@ function TaskList({ data }: { data: Data }) {
 }
 
 function HabitChips({ data }: { data: Data }) {
-  const habits = (data?.habits as
-    | Array<{
-        id: string;
-        name: string;
-        category: string | null;
-        doneToday: boolean;
-        streak: number;
-      }>
-    | undefined) ?? [];
+  const habits =
+    (data?.habits as
+      | Array<{
+          id: string;
+          name: string;
+          category: string | null;
+          doneToday: boolean;
+          streak: number;
+        }>
+      | undefined) ?? [];
   if (habits.length === 0) {
     return (
       <p className="rounded-xl border border-line bg-paper p-3 text-sm text-body-muted">
@@ -224,17 +226,103 @@ function MetricCard({
   );
 }
 
-function TransactionList({ data }: { data: Data }) {
-  const txns = (data?.transactions as
-    | Array<{
+/**
+ * Result of updateTransaction / deleteTransaction — one row, with a caption
+ * saying which of the two happened. Deliberately mirrors TransactionList's
+ * row layout so an edited transaction reads the same as it does in a list.
+ */
+/** Result of saveDayNote / getDayNote — the day's free-text note. */
+function DayNoteCard({ data }: { data: Data }) {
+  const d = data as
+    | { date?: string; content?: string | null; added?: string }
+    | undefined;
+  if (!d?.date) return null;
+  if (!d.content) {
+    return (
+      <p className="rounded-xl border border-line bg-paper p-3 text-sm text-body-muted">
+        Nothing noted for {fmtDate(d.date)}.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-paper p-3">
+      <span className="text-xs font-semibold uppercase tracking-wide text-body-muted">
+        {fmtDate(d.date)}
+      </span>
+      <p className="whitespace-pre-wrap text-sm text-ink">{d.content}</p>
+    </div>
+  );
+}
+
+function TransactionReceipt({
+  data,
+  verb,
+}: {
+  data: Data;
+  verb: "Updated" | "Deleted";
+}) {
+  const t = data as
+    | {
         id: string;
         type: "income" | "expense";
         amount: number;
         category: string | null;
         description: string | null;
         occurredOn: string;
-      }>
-    | undefined) ?? [];
+      }
+    | undefined;
+  if (!t?.id) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-semibold uppercase tracking-wide text-body-muted">
+        {verb}
+      </span>
+      <div className="flex items-center gap-3 rounded-xl border border-line bg-paper px-3 py-2">
+        <WalletIcon className="size-4 shrink-0 text-body-muted" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span
+            className={cn(
+              "truncate text-sm text-ink",
+              verb === "Deleted" && "line-through text-body-muted",
+            )}
+          >
+            {t.description || t.category || "Untitled"}
+          </span>
+          <span className="text-xs text-body-muted">
+            {fmtDate(t.occurredOn)}
+            {t.category ? ` · ${t.category}` : ""}
+          </span>
+        </div>
+        <span
+          className={cn(
+            "tabular-nums shrink-0 text-sm font-semibold",
+            verb === "Deleted"
+              ? "text-body-muted line-through"
+              : t.type === "income"
+                ? "text-rf-green-deep"
+                : "text-rf-coral",
+          )}
+        >
+          {t.type === "income" ? "+" : "-"}
+          {fmtMoney(t.amount)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TransactionList({ data }: { data: Data }) {
+  const txns =
+    (data?.transactions as
+      | Array<{
+          id: string;
+          type: "income" | "expense";
+          amount: number;
+          category: string | null;
+          description: string | null;
+          occurredOn: string;
+        }>
+      | undefined) ?? [];
   if (txns.length === 0) {
     return (
       <p className="rounded-xl border border-line bg-paper p-3 text-sm text-body-muted">
@@ -289,6 +377,13 @@ export function renderToolOutput(part: ToolUIPart): React.ReactElement | null {
       return <FinanceSummary data={data} />;
     case "tool-listRecentTransactions":
       return <TransactionList data={data} />;
+    case "tool-saveDayNote":
+    case "tool-getDayNote":
+      return <DayNoteCard data={data} />;
+    case "tool-updateTransaction":
+      return <TransactionReceipt data={data} verb="Updated" />;
+    case "tool-deleteTransaction":
+      return <TransactionReceipt data={data} verb="Deleted" />;
     default:
       return null;
   }

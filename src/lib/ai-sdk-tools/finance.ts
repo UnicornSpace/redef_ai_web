@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/server";
 import { tool } from "ai";
 import z from "zod";
+import { createClient } from "@/lib/server";
 
 /**
  * Personal-finance tools for AI Talk. Structured outputs — the chat pane
@@ -8,7 +8,14 @@ import z from "zod";
  * receipt rows, not as a wall of JSON.
  */
 
-type RangeKey = "today" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
+type RangeKey =
+  | "today"
+  | "yesterday"
+  | "week"
+  | "month"
+  | "year"
+  | "all"
+  | "custom";
 
 function dateKey(d: Date): string {
   const y = d.getFullYear();
@@ -73,7 +80,7 @@ export const getFinanceSummaryTool = tool({
   description:
     "Summarize the user's personal finance for a range: total income, " +
     "total spent, net, and top spending categories. Use for questions " +
-    "like \"how much did I spend yesterday\" or \"what did I spend on " +
+    'like "how much did I spend yesterday" or "what did I spend on ' +
     "this month\". Use range='custom' with startDate+endDate for anything " +
     "that doesn't fit a preset.",
   inputSchema: z.object({
@@ -225,6 +232,109 @@ export const addTransactionTool = tool({
     if (error) return { error: error.message };
     return {
       data: `Logged ${type} of ${amount.toFixed(2)}${category ? ` (${category})` : ""}.`,
+    };
+  },
+});
+
+export const updateTransactionTool = tool({
+  description:
+    "Edit an existing transaction. Call listRecentTransactions first to " +
+    "get the id — never guess one. Only pass the fields the user actually " +
+    "wants changed; anything omitted is left exactly as it is.",
+  inputSchema: z.object({
+    id: z.string().describe("Transaction id from listRecentTransactions"),
+    type: z.enum(["expense", "income"]).optional(),
+    amount: z.number().positive().optional().describe("Always positive"),
+    category: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    occurredOn: z.string().optional().describe("YYYY-MM-DD"),
+  }),
+  execute: async ({ id, ...changes }) => {
+    const supabase = await createClient();
+    const { data: user, error: authError } = await supabase.auth.getUser();
+    if (authError || !user?.user) {
+      return { error: authError?.message ?? "Not signed in" };
+    }
+
+    // Build the patch from only the keys the model actually sent, so
+    // "change that to 400" updates the amount without blanking the
+    // category/description it never mentioned.
+    const patch: Record<string, unknown> = {};
+    if (changes.type !== undefined) patch.type = changes.type;
+    if (changes.amount !== undefined) patch.amount = changes.amount;
+    if (changes.category !== undefined) patch.category = changes.category;
+    if (changes.description !== undefined) {
+      patch.description = changes.description;
+    }
+    if (changes.occurredOn !== undefined) {
+      patch.occurred_on = changes.occurredOn;
+    }
+    if (Object.keys(patch).length === 0) {
+      return { error: "Nothing to change — no fields were provided." };
+    }
+    patch.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("transactions")
+      .update(patch)
+      .eq("id", id)
+      .eq("user_id", user.user.id)
+      .eq("is_deleted", false)
+      .select("id, type, amount, category, description, occurred_on")
+      .maybeSingle();
+    if (error) return { error: error.message };
+    // .eq on user_id means a wrong/foreign id updates zero rows rather
+    // than erroring — report that instead of claiming success.
+    if (!data) return { error: "No such transaction." };
+
+    return {
+      data: {
+        id: data.id as string,
+        type: data.type as "income" | "expense",
+        amount: Number(data.amount ?? 0),
+        category: (data.category as string | null) ?? null,
+        description: (data.description as string | null) ?? null,
+        occurredOn: data.occurred_on as string,
+      },
+    };
+  },
+});
+
+export const deleteTransactionTool = tool({
+  description:
+    "Delete a transaction. Call listRecentTransactions first to get the " +
+    "id. Confirm with the user which transaction they mean before calling " +
+    "this — it is not undoable from chat.",
+  inputSchema: z.object({
+    id: z.string().describe("Transaction id from listRecentTransactions"),
+  }),
+  execute: async ({ id }) => {
+    const supabase = await createClient();
+    const { data: user, error: authError } = await supabase.auth.getUser();
+    if (authError || !user?.user) {
+      return { error: authError?.message ?? "Not signed in" };
+    }
+    // Soft delete, matching deleteTransaction() in src/actions/finance.ts.
+    const { data, error } = await supabase
+      .from("transactions")
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user.user.id)
+      .eq("is_deleted", false)
+      .select("id, type, amount, category, description, occurred_on")
+      .maybeSingle();
+    if (error) return { error: error.message };
+    if (!data) return { error: "No such transaction." };
+
+    return {
+      data: {
+        id: data.id as string,
+        type: data.type as "income" | "expense",
+        amount: Number(data.amount ?? 0),
+        category: (data.category as string | null) ?? null,
+        description: (data.description as string | null) ?? null,
+        occurredOn: data.occurred_on as string,
+      },
     };
   },
 });

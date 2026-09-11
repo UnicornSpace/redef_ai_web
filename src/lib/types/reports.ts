@@ -10,12 +10,27 @@
 
 import type { ModuleKey } from "@/lib/modules";
 
+/**
+ * Per-day values for the two 7-day windows, index 0 = oldest day. Drives
+ * the recap's comparison charts.
+ *
+ * OPTIONAL on purpose: snapshots written before this existed are stored as
+ * JSON in weekly_report_snapshots.data and will never gain the field, so
+ * every consumer has to treat it as possibly-absent and fall back to the
+ * scalar current/previous rather than assuming an array.
+ */
+export interface MetricSeries {
+  current: number[];
+  previous: number[];
+}
+
 /** A single stat: this window's value, the window before it, and a
     trailing 4-week average to gauge it against. */
 export interface ReportMetric {
   current: number;
   previous: number;
   monthAvgPerWeek: number;
+  series?: MetricSeries;
 }
 
 export interface WeeklyReportData {
@@ -28,9 +43,11 @@ export interface WeeklyReportData {
   habits: (ReportMetric & { activeHabits: number; bestStreak: number }) | null;
   tasks: ReportMetric | null;
   deepWork: (ReportMetric & { unit: "hours" }) | null;
-  personalFinance:
-    | { spent: ReportMetric; income: ReportMetric; net: ReportMetric }
-    | null;
+  personalFinance: {
+    spent: ReportMetric;
+    income: ReportMetric;
+    net: ReportMetric;
+  } | null;
 }
 
 export interface WeeklyReportSnapshot {

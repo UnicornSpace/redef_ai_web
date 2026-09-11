@@ -75,7 +75,7 @@ const NAV_ITEMS = [
   },
   {
     href: "/app/reports",
-    label: "Reports",
+    label: "Recap",
     icon: BarChart3,
     size: "size-5!",
     moduleKey: null,

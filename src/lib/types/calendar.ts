@@ -21,6 +21,10 @@ export interface DaySummary {
   financeCount: number;
   workSeconds: number;
   googleEvents: { id: string; title: string; allDay: boolean }[];
+  /** Free-text note for the day — see src/actions/day-notes.ts. */
+  note: string | null;
+  /** Who wrote `note`; null when there is no note. */
+  noteSource: "manual" | "ai" | null;
 }
 
 const PALETTE: CalendarEventColor[] = [
