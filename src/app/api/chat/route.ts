@@ -16,10 +16,8 @@ import {
 } from "@/actions/chat";
 import { getMyProfile } from "@/actions/profile";
 import { getMyStandards } from "@/actions/standards";
-import { getUserBaseline } from "@/lib/baseline";
-import { buildSystemPrompt } from "@/lib/chat-prompt";
-import { DEFAULT_ENABLED_MODULES, type ModuleKey } from "@/lib/modules";
-import { updateWorkStandardsTool } from "@/lib/ai-sdk-tools/standards";
+import { getDayNoteTool, saveDayNoteTool } from "@/lib/ai-sdk-tools/day-notes";
+import { getDayReviewTool } from "@/lib/ai-sdk-tools/day-review";
 import {
   getDeepWorkSummaryTool,
   listDeepWorkProjectsTool,
@@ -29,10 +27,11 @@ import {
 } from "@/lib/ai-sdk-tools/deepwork";
 import {
   addTransactionTool,
+  deleteTransactionTool,
   getFinanceSummaryTool,
   listRecentTransactionsTool,
+  updateTransactionTool,
 } from "@/lib/ai-sdk-tools/finance";
-import { getDayReviewTool } from "@/lib/ai-sdk-tools/day-review";
 import {
   createHabitTool,
   listHabitsTool,
@@ -41,12 +40,16 @@ import {
   toggleHabitTodayTool,
 } from "@/lib/ai-sdk-tools/habits";
 import { updateMemoryTool } from "@/lib/ai-sdk-tools/memory";
+import { updateWorkStandardsTool } from "@/lib/ai-sdk-tools/standards";
 import {
   addTasksTool,
   getSecretPinTool,
   getTasksTool,
   markTaskAsCompletedTool,
 } from "@/lib/ai-sdk-tools/tasks";
+import { getUserBaseline } from "@/lib/baseline";
+import { buildSystemPrompt } from "@/lib/chat-prompt";
+import { DEFAULT_ENABLED_MODULES, type ModuleKey } from "@/lib/modules";
 import { createClient } from "@/lib/server";
 
 // Allow streaming responses up to 30 seconds
@@ -71,7 +74,9 @@ function formatChatError(error: unknown): string {
   // go completely unlogged.
   console.error("[chat] streamText error:", error);
   const message = error instanceof Error ? error.message : String(error);
-  return message ? message.slice(0, 400) : "Something went wrong generating a response.";
+  return message
+    ? message.slice(0, 400)
+    : "Something went wrong generating a response.";
 }
 
 export async function POST(req: Request) {
@@ -143,6 +148,10 @@ export async function POST(req: Request) {
       // Spans every module and gates itself internally on what's enabled,
       // so it's registered unconditionally rather than per-module.
       getDayReview: getDayReviewTool,
+      // Day notes exist precisely FOR what the modules don't cover, so
+      // gating them behind a module would defeat the point.
+      saveDayNote: saveDayNoteTool,
+      getDayNote: getDayNoteTool,
       getSecretPin: getSecretPinTool,
       ...(enabledModules.includes("tasks")
         ? {
@@ -174,6 +183,8 @@ export async function POST(req: Request) {
             getFinanceSummary: getFinanceSummaryTool,
             listRecentTransactions: listRecentTransactionsTool,
             addTransaction: addTransactionTool,
+            updateTransaction: updateTransactionTool,
+            deleteTransaction: deleteTransactionTool,
           }
         : {}),
     },

@@ -6,7 +6,11 @@ import { createAdminClient } from "@/lib/admin";
 import { sendWeeklyReportEmail } from "@/lib/email/weekly-report";
 import { DEFAULT_ENABLED_MODULES, type ModuleKey } from "@/lib/modules";
 import { createClient } from "@/lib/server";
-import type { ReportMetric, WeeklyReportData, WeeklyReportSnapshot } from "@/lib/types/reports";
+import type {
+  ReportMetric,
+  WeeklyReportData,
+  WeeklyReportSnapshot,
+} from "@/lib/types/reports";
 
 /**
  * Two ways this report gets produced:
@@ -65,11 +69,42 @@ function computeWindows(asOfKey: string): Windows {
   };
 }
 
+/** Whole days from aKey to bKey (both YYYY-MM-DD, UTC-anchored). */
+function daysBetween(aKey: string, bKey: string): number {
+  const a = Date.parse(`${aKey}T00:00:00Z`);
+  const b = Date.parse(`${bKey}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Seven zeroed day-buckets; index 0 is the oldest day of the window. */
+function emptyWeek(): number[] {
+  return [0, 0, 0, 0, 0, 0, 0];
+}
+
+/**
+ * Adds `value` to the right day-bucket if `dayKey` falls inside the 7-day
+ * window starting at `startKey`. Out-of-window dates are ignored, so
+ * callers can feed it every row without pre-filtering.
+ */
+function addToWeek(
+  week: number[],
+  startKey: string,
+  dayKey: string,
+  value: number,
+): void {
+  const i = daysBetween(startKey, dayKey);
+  if (i >= 0 && i < 7) week[i] += value;
+}
+
 function formatWindowLabel(w: Windows): string {
   const start = new Date(`${w.last7Start}T00:00:00Z`);
   const end = new Date(`${w.todayKey}T00:00:00Z`);
   const fmt = (d: Date) =>
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
@@ -82,8 +117,12 @@ async function computeReportForUser(
   const w = computeWindows(asOfKey);
 
   const [habits, tasks, deepWork, personalFinance] = await Promise.all([
-    enabledModules.includes("habits") ? buildHabitsMetric(supabase, userId, w) : null,
-    enabledModules.includes("tasks") ? buildTasksMetric(supabase, userId, w) : null,
+    enabledModules.includes("habits")
+      ? buildHabitsMetric(supabase, userId, w)
+      : null,
+    enabledModules.includes("tasks")
+      ? buildTasksMetric(supabase, userId, w)
+      : null,
     enabledModules.includes("deep_work")
       ? buildDeepWorkMetric(supabase, userId, w)
       : null,
@@ -113,7 +152,12 @@ export async function getWeeklyReport(): Promise<WeeklyReportData | null> {
 
   const profile = await getMyProfile();
   const enabledModules = profile?.enabled_modules ?? DEFAULT_ENABLED_MODULES;
-  return computeReportForUser(supabase, userId, enabledModules, dateKey(new Date()));
+  return computeReportForUser(
+    supabase,
+    userId,
+    enabledModules,
+    dateKey(new Date()),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +168,9 @@ async function buildHabitsMetric(
   supabase: Supa,
   userId: string,
   w: Windows,
-): Promise<(ReportMetric & { activeHabits: number; bestStreak: number }) | null> {
+): Promise<
+  (ReportMetric & { activeHabits: number; bestStreak: number }) | null
+> {
   const { data, error } = await supabase
     .from("habits")
     .select("completed_dates, current_streak, started_at, is_deleted")
@@ -137,6 +183,8 @@ async function buildHabitsMetric(
   let monthTotal = 0;
   let bestStreak = 0;
   let activeHabits = 0;
+  const curSeries = emptyWeek();
+  const prevSeries = emptyWeek();
 
   for (const h of data as {
     completed_dates: string[] | null;
@@ -149,6 +197,8 @@ async function buildHabitsMetric(
       if (d >= w.last7Start && d <= w.todayKey) current++;
       if (d >= w.prev7Start && d <= w.prev7End) previous++;
       if (d >= w.monthStart && d <= w.todayKey) monthTotal++;
+      addToWeek(curSeries, w.last7Start, d, 1);
+      addToWeek(prevSeries, w.prev7Start, d, 1);
     }
   }
 
@@ -156,6 +206,7 @@ async function buildHabitsMetric(
     current,
     previous,
     monthAvgPerWeek: monthTotal / 4,
+    series: { current: curSeries, previous: prevSeries },
     activeHabits,
     bestStreak,
   };
@@ -181,13 +232,22 @@ async function buildTasksMetric(
   let current = 0;
   let previous = 0;
   let monthTotal = 0;
+  const curSeries = emptyWeek();
+  const prevSeries = emptyWeek();
   for (const t of data as { updated_at: string }[]) {
     const d = t.updated_at.slice(0, 10);
     if (d >= w.last7Start && d <= w.todayKey) current++;
     if (d >= w.prev7Start && d <= w.prev7End) previous++;
     monthTotal++;
+    addToWeek(curSeries, w.last7Start, d, 1);
+    addToWeek(prevSeries, w.prev7Start, d, 1);
   }
-  return { current, previous, monthAvgPerWeek: monthTotal / 4 };
+  return {
+    current,
+    previous,
+    monthAvgPerWeek: monthTotal / 4,
+    series: { current: curSeries, previous: prevSeries },
+  };
 }
 
 async function buildDeepWorkMetric(
@@ -205,17 +265,26 @@ async function buildDeepWorkMetric(
   let currentSec = 0;
   let previousSec = 0;
   let monthSec = 0;
-  for (const s of data as { start_time: string; duration_in_seconds: number }[]) {
+  const curSeries = emptyWeek();
+  const prevSeries = emptyWeek();
+  for (const s of data as {
+    start_time: string;
+    duration_in_seconds: number;
+  }[]) {
     const d = s.start_time.slice(0, 10);
     const secs = s.duration_in_seconds ?? 0;
     if (d >= w.last7Start && d <= w.todayKey) currentSec += secs;
     if (d >= w.prev7Start && d <= w.prev7End) previousSec += secs;
     monthSec += secs;
+    // Series is in hours, matching current/previous below.
+    addToWeek(curSeries, w.last7Start, d, secs / 3600);
+    addToWeek(prevSeries, w.prev7Start, d, secs / 3600);
   }
   return {
     current: currentSec / 3600,
     previous: previousSec / 3600,
     monthAvgPerWeek: monthSec / 3600 / 4,
+    series: { current: curSeries, previous: prevSeries },
     unit: "hours",
   };
 }
@@ -224,7 +293,11 @@ async function buildFinanceMetric(
   supabase: Supa,
   userId: string,
   w: Windows,
-): Promise<{ spent: ReportMetric; income: ReportMetric; net: ReportMetric } | null> {
+): Promise<{
+  spent: ReportMetric;
+  income: ReportMetric;
+  net: ReportMetric;
+} | null> {
   const { data, error } = await supabase
     .from("transactions")
     .select("type, amount, occurred_on")
@@ -233,7 +306,13 @@ async function buildFinanceMetric(
     .gte("occurred_on", w.monthStart);
   if (error || !data) return null;
 
-  const zero = () => ({ current: 0, previous: 0, monthTotal: 0 });
+  const zero = () => ({
+    current: 0,
+    previous: 0,
+    monthTotal: 0,
+    curSeries: emptyWeek(),
+    prevSeries: emptyWeek(),
+  });
   const spent = zero();
   const income = zero();
 
@@ -247,13 +326,21 @@ async function buildFinanceMetric(
     if (d >= w.last7Start && d <= w.todayKey) bucket.current += t.amount;
     if (d >= w.prev7Start && d <= w.prev7End) bucket.previous += t.amount;
     if (d >= w.monthStart && d <= w.todayKey) bucket.monthTotal += t.amount;
+    addToWeek(bucket.curSeries, w.last7Start, d, t.amount);
+    addToWeek(bucket.prevSeries, w.prev7Start, d, t.amount);
   }
 
   const toMetric = (b: ReturnType<typeof zero>): ReportMetric => ({
     current: b.current,
     previous: b.previous,
     monthAvgPerWeek: b.monthTotal / 4,
+    series: { current: b.curSeries, previous: b.prevSeries },
   });
+
+  // Net is income minus spend day-by-day, so its chart can legitimately
+  // dip below zero on a heavy-spend day — that's the interesting shape.
+  const netSeries = (key: "curSeries" | "prevSeries") =>
+    income[key].map((v, i) => v - spent[key][i]);
 
   return {
     spent: toMetric(spent),
@@ -262,6 +349,10 @@ async function buildFinanceMetric(
       current: income.current - spent.current,
       previous: income.previous - spent.previous,
       monthAvgPerWeek: (income.monthTotal - spent.monthTotal) / 4,
+      series: {
+        current: netSeries("curSeries"),
+        previous: netSeries("prevSeries"),
+      },
     },
   };
 }
@@ -352,7 +443,9 @@ export async function markWeeklyReportsSeen(): Promise<{ error?: string }> {
 // invoke this — it needs the service-role key and touches every user.
 // ---------------------------------------------------------------------------
 
-export async function runWeeklyReportCronForAllUsers(asOfKey?: string): Promise<{
+export async function runWeeklyReportCronForAllUsers(
+  asOfKey?: string,
+): Promise<{
   processed: number;
   emailed: number;
   errors: { userId: string; message: string }[];
@@ -365,17 +458,28 @@ export async function runWeeklyReportCronForAllUsers(asOfKey?: string): Promise<
     .select("user_id, enabled_modules")
     .not("onboarded_at", "is", null);
   if (profilesError || !profiles) {
-    return { processed: 0, emailed: 0, errors: [{ userId: "*", message: profilesError?.message ?? "No profiles" }] };
+    return {
+      processed: 0,
+      emailed: 0,
+      errors: [
+        { userId: "*", message: profilesError?.message ?? "No profiles" },
+      ],
+    };
   }
 
   // One paginated call for every user's email, rather than an admin
   // lookup per user — fine up to ~1000 users; page through past that.
-  const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
+  const { data: usersPage, error: usersError } =
+    await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
   if (usersError) {
-    return { processed: 0, emailed: 0, errors: [{ userId: "*", message: usersError.message }] };
+    return {
+      processed: 0,
+      emailed: 0,
+      errors: [{ userId: "*", message: usersError.message }],
+    };
   }
   const emailByUserId = new Map<string, string | undefined>(
     usersPage.users.map((u) => [u.id, u.email]),
@@ -385,20 +489,31 @@ export async function runWeeklyReportCronForAllUsers(asOfKey?: string): Promise<
   let emailed = 0;
   const errors: { userId: string; message: string }[] = [];
 
-  for (const p of profiles as { user_id: string; enabled_modules: string[] | null }[]) {
+  for (const p of profiles as {
+    user_id: string;
+    enabled_modules: string[] | null;
+  }[]) {
     try {
-      const enabledModules = (p.enabled_modules ?? DEFAULT_ENABLED_MODULES) as ModuleKey[];
-      const data = await computeReportForUser(admin, p.user_id, enabledModules, reference);
-
-      const { error: upsertError } = await admin.from("weekly_report_snapshots").upsert(
-        {
-          user_id: p.user_id,
-          week_start: data.weekStart,
-          week_end: data.weekEnd,
-          data,
-        },
-        { onConflict: "user_id,week_start" },
+      const enabledModules = (p.enabled_modules ??
+        DEFAULT_ENABLED_MODULES) as ModuleKey[];
+      const data = await computeReportForUser(
+        admin,
+        p.user_id,
+        enabledModules,
+        reference,
       );
+
+      const { error: upsertError } = await admin
+        .from("weekly_report_snapshots")
+        .upsert(
+          {
+            user_id: p.user_id,
+            week_start: data.weekStart,
+            week_end: data.weekEnd,
+            data,
+          },
+          { onConflict: "user_id,week_start" },
+        );
       if (upsertError) {
         errors.push({ userId: p.user_id, message: upsertError.message });
         continue;
@@ -409,7 +524,10 @@ export async function runWeeklyReportCronForAllUsers(asOfKey?: string): Promise<
       if (email) {
         const sendResult = await sendWeeklyReportEmail({ to: email, data });
         if (sendResult.error) {
-          errors.push({ userId: p.user_id, message: `email: ${sendResult.error}` });
+          errors.push({
+            userId: p.user_id,
+            message: `email: ${sendResult.error}`,
+          });
         } else {
           emailed++;
           await admin

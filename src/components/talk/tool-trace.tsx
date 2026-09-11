@@ -15,6 +15,7 @@ import {
   ListTodoIcon,
   Loader2Icon,
   type LucideIcon,
+  NotebookPenIcon,
   PencilIcon,
   PlusIcon,
   ReceiptIcon,
@@ -70,6 +71,16 @@ const TOOL_META: Record<string, { label: string; Icon: LucideIcon }> = {
     Icon: ReceiptIcon,
   },
   "tool-addTransaction": { label: "Logging a transaction", Icon: BanknoteIcon },
+  "tool-updateTransaction": {
+    label: "Editing a transaction",
+    Icon: ReceiptIcon,
+  },
+  "tool-deleteTransaction": {
+    label: "Deleting a transaction",
+    Icon: ReceiptIcon,
+  },
+  "tool-saveDayNote": { label: "Noting your day", Icon: NotebookPenIcon },
+  "tool-getDayNote": { label: "Checking your day note", Icon: NotebookPenIcon },
   "tool-updateMemory": { label: "Updating memory", Icon: BrainIcon },
   "tool-createHabit": { label: "Setting up a new habit", Icon: PlusIcon },
   "tool-listRecentDeepWorkSessions": {
@@ -90,13 +101,7 @@ function isComplete(state: ToolUIPart["state"]): boolean {
   );
 }
 
-function TraceStep({
-  part,
-  isLast,
-}: {
-  part: ToolUIPart;
-  isLast: boolean;
-}) {
+function TraceStep({ part, isLast }: { part: ToolUIPart; isLast: boolean }) {
   const meta = TOOL_META[part.type] ?? {
     label: part.type.replace("tool-", ""),
     Icon: WrenchIcon,

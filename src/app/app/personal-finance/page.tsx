@@ -15,16 +15,19 @@ async function FinanceData() {
 export default function PersonalFinancePage() {
   return (
     <div className="flex w-full flex-col">
-      <PageHeader
-        title="Personal Finance"
-        // description="Log an expense or income, tag it with a category and a space, and see where your money goes."
-      />
+      {/* FinanceClient renders the real header — it carries the range/type
+          filters, which are client state. The fallback below repeats a
+          filter-less copy so the title is on screen immediately and does
+          not shift when the data lands. */}
       <Suspense
         fallback={
-          <div className="flex flex-col gap-5 mt-6">
-            <StatTilesSkeleton count={3} />
-            <ListRowsSkeleton rows={4} />
-          </div>
+          <>
+            <PageHeader title="Personal Finance" />
+            <div className="flex flex-col gap-5 mt-6">
+              <StatTilesSkeleton count={3} />
+              <ListRowsSkeleton rows={4} />
+            </div>
+          </>
         }
       >
         <FinanceData />

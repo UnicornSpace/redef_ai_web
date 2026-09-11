@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import type React from "react";
+import { useState } from "react";
 import { BsStars } from "react-icons/bs";
 import { FaTasks } from "react-icons/fa";
 import { FaMoneyBill } from "react-icons/fa6";
@@ -67,7 +67,7 @@ const MORE_ITEMS = [
   },
   {
     href: "/app/reports",
-    label: "Reports",
+    label: "Recap",
     icon: BarChart3,
     moduleKey: null,
   },
@@ -96,7 +96,8 @@ export function MobileTabBar({
   if (navHidden) return null;
 
   const visibleMoreItems = MORE_ITEMS.filter(
-    (item) => item.moduleKey === null || enabledModules.includes(item.moduleKey),
+    (item) =>
+      item.moduleKey === null || enabledModules.includes(item.moduleKey),
   );
 
   return (
